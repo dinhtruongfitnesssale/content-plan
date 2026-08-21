@@ -8,6 +8,7 @@ import {
   type ProviderId,
   type SearchOptions,
   tierRank,
+  toTiers,
   toTier,
 } from "./types";
 
@@ -142,10 +143,13 @@ function longest(a: string | null, b: string | null): string | null {
  * phân tích gộp năm 2019 đáng tin hơn một nghiên cứu quan sát năm 2025.
  */
 function rank(papers: Paper[], tiers?: EvidenceTier[]): Paper[] {
-  const wanted = tiers?.length && !tiers.includes("khac") ? new Set(tiers) : null;
+  const wanted = tiers?.length && !tiers.includes("other") ? new Set(tiers) : null;
 
+  // Lọc theo MỌI bậc bài khớp, không chỉ bậc đại diện — nếu không thì chọn
+  // "Systematic Review" sẽ ra rỗng, vì phần lớn tổng quan hệ thống đồng thời
+  // mang nhãn phân tích gộp và bị quy lên bậc trên.
   const filtered = wanted
-    ? papers.filter((paper) => wanted.has(toTier(paper.studyTypes)))
+    ? papers.filter((paper) => toTiers(paper.studyTypes).some((tier) => wanted.has(tier)))
     : papers;
 
   return filtered.sort((a, b) => {

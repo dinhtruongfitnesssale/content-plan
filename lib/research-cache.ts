@@ -1,4 +1,4 @@
-import type { EvidenceTier } from "@/lib/research";
+import { EVIDENCE_TIERS, type EvidenceTier } from "@/lib/research";
 import type { ResearchResponse } from "@/lib/types";
 
 /**
@@ -15,7 +15,12 @@ import type { ResearchResponse } from "@/lib/types";
  * `lib/store/` (nơi lưu bài đã soạn, có thể là Supabase).
  */
 
-const KEY = "ban-viet:tra-cuu-gan-nhat";
+/**
+ * Có đánh số phiên bản: tên các bậc bằng chứng đã đổi sang thang EBM, nên
+ * bản lưu cũ mang id không còn tồn tại. Đổi khoá là bỏ hẳn bản cũ, chắc chắn
+ * hơn cố đọc rồi vá.
+ */
+const KEY = "ban-viet:tra-cuu-gan-nhat:v2";
 
 export const CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -42,7 +47,14 @@ export function readResearchCache(): ResearchCache | null {
       localStorage.removeItem(KEY);
       return null;
     }
-    return cached;
+
+    // Bậc lạ thì bỏ, đừng gửi lên API rồi lĩnh 400 vì một giá trị đã bị gỡ.
+    const valid = new Set<string>(EVIDENCE_TIERS);
+    return {
+      ...cached,
+      tiers: (cached.tiers ?? []).filter((tier) => valid.has(tier)),
+      chosen: cached.chosen ?? [],
+    };
   } catch {
     // Dữ liệu hỏng hoặc trình duyệt chặn localStorage — coi như chưa có.
     return null;

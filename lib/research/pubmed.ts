@@ -22,19 +22,25 @@ export const pubmed: Provider = {
   },
 };
 
-/** [pt] tags của PubMed cho từng bậc bằng chứng. */
+/**
+ * Mỗi bậc trong tháp EBM ứng với những tag tìm kiếm nào của PubMed.
+ *
+ * Hai loại tag, không thể thay cho nhau:
+ * - `[pt]` PublicationType — meta-analysis, systematic review, RCT, case reports.
+ * - `[mh]` MeSH heading — cohort / case-control / cross-sectional. PubMed KHÔNG
+ *   có PublicationType cho ba thiết kế quan sát này; chúng chỉ tồn tại dưới
+ *   dạng MeSH. Tra bằng `[pt]` sẽ luôn trả về rỗng.
+ */
 const TIER_PT: Record<EvidenceTier, string[]> = {
-  "tong-quan-he-thong": [
-    "meta-analysis[pt]",
-    "systematic review[pt]",
-    "practice guideline[pt]",
-  ],
-  "thu-nghiem-ngau-nhien": [
-    "randomized controlled trial[pt]",
-    "clinical trial[pt]",
-  ],
-  "quan-sat": ["observational study[pt]", "comparative study[pt]"],
-  khac: [],
+  "meta-analysis": ["meta-analysis[pt]"],
+  "systematic-review": ["systematic review[pt]"],
+  rct: ["randomized controlled trial[pt]", "controlled clinical trial[pt]"],
+  cohort: ["cohort studies[mh]", "longitudinal studies[mh]"],
+  "case-control": ["case-control studies[mh]"],
+  "cross-sectional": ["cross-sectional studies[mh]"],
+  "case-series": ["case reports[pt]"],
+  "animal-lab": ["animals[mh:noexp]"],
+  other: [],
 };
 
 function commonParams(): URLSearchParams {
@@ -53,9 +59,9 @@ function buildTerm(query: string, opts: SearchOptions): string {
   const yearMax = opts.yearMax ?? new Date().getFullYear();
   if (yearMin) parts.push(`("${yearMin}"[dp] : "${yearMax}"[dp])`);
 
-  // "khac" nghĩa là không giới hạn loại nghiên cứu — lọc theo [pt] sẽ vô nghĩa.
+  // "other" nghĩa là không giới hạn thiết kế — lọc theo tag sẽ vô nghĩa.
   const tiers = opts.tiers;
-  if (tiers?.length && !tiers.includes("khac")) {
+  if (tiers?.length && !tiers.includes("other")) {
     const tags = tiers.flatMap((tier) => TIER_PT[tier]);
     if (tags.length > 0) parts.push(`(${tags.join(" OR ")})`);
   }
@@ -170,7 +176,10 @@ function toPaper(article: Record<string, unknown>): Paper | null {
     pmid,
     url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
     citedByCount: null, // PubMed không cung cấp — OpenAlex bù vào khi gộp.
-    studyTypes: readStudyTypes(art.PublicationTypeList),
+    studyTypes: [
+      ...readStudyTypes(art.PublicationTypeList),
+      ...readDesignMesh(citation.MeshHeadingList),
+    ],
     isOpenAccess: false, // không suy được từ PubMed; OpenAlex quyết định.
     takeaway: null,
     sampleSize: null,
@@ -224,6 +233,37 @@ function readStudyTypes(node: unknown): string[] {
   return list
     .map((entry) => text(entry))
     .filter((value) => value.length > 0 && value !== "Journal Article");
+}
+
+/**
+ * Những MeSH descriptor mô tả THIẾT KẾ nghiên cứu, không phải chủ đề.
+ *
+ * Cần cái này vì PubMed không có PublicationType cho cohort / case-control /
+ * cross-sectional — thiếu MeSH thì mọi nghiên cứu quan sát đều rơi xuống bậc
+ * "Other", trong khi bộ lọc lại tra được chúng qua `[mh]`. Lệch nhau như vậy
+ * là kiểu hỏng khó thấy nhất: lọc ra đúng bài nhưng dán sai nhãn.
+ *
+ * Cố tình dùng danh sách trắng hẹp. Đổ hết MeSH vào `studyTypes` sẽ kéo theo
+ * hàng chục nhãn chủ đề và làm `toTier()` khớp nhầm.
+ */
+const DESIGN_MESH = new Set([
+  "cohort studies",
+  "longitudinal studies",
+  "case-control studies",
+  "cross-sectional studies",
+  "animals",
+]);
+
+function readDesignMesh(node: unknown): string[] {
+  const headings = asArray((node as Record<string, unknown> | undefined)?.MeshHeading);
+
+  const found: string[] = [];
+  for (const heading of headings) {
+    if (typeof heading !== "object" || heading === null) continue;
+    const name = text((heading as Record<string, unknown>).DescriptorName);
+    if (name && DESIGN_MESH.has(name.toLowerCase())) found.push(name);
+  }
+  return found;
 }
 
 function readDoi(

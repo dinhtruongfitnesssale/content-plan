@@ -76,10 +76,15 @@ export function isConsensusEnabled(): boolean {
  * Kiểm bằng dữ liệu thật 21/08/2026; danh sách hợp lệ nằm trong thân lỗi 422.
  */
 const TIER_STUDY_TYPES: Record<EvidenceTier, string[]> = {
-  "tong-quan-he-thong": ["meta-analysis", "systematic review", "literature review"],
-  "thu-nghiem-ngau-nhien": ["rct"],
-  "quan-sat": ["cohort study", "case-control study", "cross-sectional study"],
-  khac: [],
+  "meta-analysis": ["meta-analysis"],
+  "systematic-review": ["systematic review", "literature review"],
+  rct: ["rct"],
+  cohort: ["cohort study", "longitudinal / panel data study"],
+  "case-control": ["case-control study"],
+  "cross-sectional": ["cross-sectional study"],
+  "case-series": ["case report", "case study"],
+  "animal-lab": ["animal", "bench experiment", "non-rct in vitro"],
+  other: [],
 };
 
 type SearchResponse = {

@@ -40,6 +40,11 @@ Nút chính là **nền ink, chữ paper** — không phải nền amber.
 - `lib/research/` — tầng nguồn nghiên cứu. Mỗi provider trả về `Paper` chuẩn hoá.
   `index.ts` gọi song song bằng `allSettled`, gộp trùng theo DOI → PMID → tiêu đề,
   xếp hạng theo **bậc bằng chứng trước, năm sau**.
+  Bậc bằng chứng theo tháp EBM 8 mức, thứ tự mảng `EVIDENCE_TIERS` chính là thứ hạng.
+  Hai hàm, đừng dùng lẫn: `toTier()` trả **một** bậc đại diện (bậc cao nhất) — dùng để
+  hiển thị và xếp hạng; `toTiers()` trả **mọi** bậc bài khớp — dùng để lọc. Lọc bằng
+  `toTier()` thì chọn "Systematic Review" ra rỗng, vì hầu hết tổng quan hệ thống đồng
+  thời mang nhãn phân tích gộp và bị quy lên bậc trên.
 - `lib/findings.ts` — `Finding` + `verifyFindings()`, rào chắn chống bịa số liệu.
 - `lib/prompts.ts` — mọi prompt gửi model.
 - `app/api/*/route.ts` — route handler. Key API chỉ tồn tại ở đây, không bao giờ ở client.
@@ -47,7 +52,11 @@ Nút chính là **nền ink, chữ paper** — không phải nền amber.
 ### Nguồn nghiên cứu
 
 - **PubMed** là nguồn abstract chính. `<PublicationType>` do người lập chỉ mục gán tay
-  cho phép xếp bậc bằng chứng mà không phải đoán.
+  cho phép xếp bậc bằng chứng mà không phải đoán. Nhưng PubMed **không có**
+  PublicationType cho cohort / case-control / cross-sectional — ba thiết kế này chỉ
+  tồn tại dưới dạng MeSH, nên `TIER_PT` trộn cả `[pt]` lẫn `[mh]`, và `readDesignMesh()`
+  phải đọc thêm `<MeshHeadingList>`. Thiếu vế sau thì lọc ra đúng bài nhưng dán nhãn
+  "Other" — lệch giữa truy vấn và nhãn là kiểu hỏng khó thấy nhất ở tầng này.
 - **OpenAlex** bù lượt trích dẫn + link đọc miễn phí + độ phủ ngoài y sinh.
   `abstract_inverted_index` hay null — đừng dựa vào nó để lấy abstract.
 - **Consensus** chỉ chạy khi có `CONSENSUS_API_KEY`. $0.10/lượt gọi, mặc định tắt.
