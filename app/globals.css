@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------
+   Hệ thiết kế: giấy + mực. Quy tắc 90/5/5.
+   90% paper+ink · 5% amber · 5% herb/slate/clay khi có vai trò rõ.
+   Không bao giờ dùng #FFFFFF. Không bao giờ fill khối bằng amber.
+   --------------------------------------------------------------- */
+
+@theme {
+  --color-paper: #f6f2ea;
+  --color-ink: #14110e;
+  --color-amber: #b5651e;
+  --color-herb: #5c6e48;
+  --color-slate: #3a5567;
+  --color-clay: #a33a2a;
+
+  --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-be-vietnam), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "Courier New", monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Eyebrow — mono, hoa, giãn chữ, amber. Một trong 5 chỗ được dùng amber. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-amber);
+}
+
+/* Đường kẻ editorial mảnh. */
+.rule {
+  border-color: color-mix(in srgb, var(--color-ink) 14%, transparent);
+}
+
+/* Trích nguyên văn từ abstract: dấu nháy amber, nội dung ink. */
+.quoted::before,
+.quoted::after {
+  color: var(--color-amber);
+}
+.quoted::before { content: "« "; }
+.quoted::after  { content: " »"; }
+
+/* Số liệu luôn tabular để cột không nhảy. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--color-amber) 22%, transparent);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+/* Thanh trượt độ dài — track mực mảnh, núm mực đặc. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 1px;
+  background: color-mix(in srgb, var(--color-ink) 24%, transparent);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  height: 13px;
+  width: 13px;
+  border-radius: 9999px;
+  background: var(--color-ink);
+}
+input[type="range"]::-moz-range-track {
+  height: 1px;
+  background: color-mix(in srgb, var(--color-ink) 24%, transparent);
+}
+input[type="range"]::-moz-range-thumb {
+  height: 13px;
+  width: 13px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--color-ink);
+}

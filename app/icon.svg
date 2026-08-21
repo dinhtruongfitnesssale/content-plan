@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    Ngòi bút mực chạm mặt bàn — tên app là "Bàn viết".
+
+    Quy tắc 90/5/5: nền paper + ngòi ink chiếm gần hết, amber chỉ ở
+    một nét kẻ mảnh là mặt bàn. Không fill khối bằng amber.
+
+    Hình đã dò ở 16px rồi mới chốt, vì favicon sống chết ở cỡ đó:
+    - Lỗ thoát khí và khe ngòi phải LIỀN nhau thành một nét cắt duy nhất.
+      Tách rời thì khi thu nhỏ chúng nhoè thành một vệt xám mất nghĩa.
+    - Khe rộng 3.0 là mức tối thiểu còn thấy được ở 16px, nhưng thân ngòi
+      phải rộng theo (4.5→27.5) để hai bên khe không mảnh đến mức đứt nét.
+    - Mũi ngòi dừng ở y=26, cách mặt bàn một khoảng hở. Sát hơn thì ở 16px
+      ngòi dính vào nét amber thành một khối.
+  -->
+  <rect width="32" height="32" fill="#F6F2EA"/>
+
+  <path d="M4.5 3 H27.5 L21 18 L16 26 L11 18 Z" fill="#14110E"/>
+  <circle cx="16" cy="9.5" r="3.4" fill="#F6F2EA"/>
+  <path d="M14.5 9.5 h3 v12 h-3 Z" fill="#F6F2EA"/>
+
+  <rect x="3" y="28.2" width="26" height="2.4" fill="#B5651E"/>
+</svg>

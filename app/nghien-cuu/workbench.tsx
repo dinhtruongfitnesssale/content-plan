@@ -1,0 +1,408 @@
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  Button,
+  Card,
+  EmptyNote,
+  ErrorNote,
+  Eyebrow,
+  Num,
+  PageHeader,
+  Quoted,
+  StrengthBadge,
+} from "@/components/ui";
+import { EVIDENCE_TIERS, TIER_LABEL, toTier, type EvidenceTier } from "@/lib/research";
+import { HANDOFF_KEY, type Finding, type Paper, type ResearchResponse } from "@/lib/types";
+
+const YEAR_CHOICES = [
+  { value: 0, label: "Mọi năm" },
+  { value: 2015, label: "Từ 2015" },
+  { value: 2020, label: "Từ 2020" },
+] as const;
+
+export function ResearchWorkbench() {
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const [query, setQuery] = useState("");
+  const [yearMin, setYearMin] = useState<number>(2015);
+  const [tiers, setTiers] = useState<EvidenceTier[]>([]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ResearchResponse | null>(null);
+  const [chosen, setChosen] = useState<Set<number>>(new Set());
+
+  // Trang "Hôm nay" chuyển chủ đề sang đây qua ?chu-de=
+  useEffect(() => {
+    const seeded = params.get("chu-de");
+    if (seeded) setQuery(seeded);
+  }, [params]);
+
+  async function run(event: React.FormEvent) {
+    event.preventDefault();
+    if (query.trim().length < 2 || pending) return;
+
+    setPending(true);
+    setError(null);
+    setResult(null);
+    setChosen(new Set());
+
+    try {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          query: query.trim(),
+          yearMin: yearMin || undefined,
+          tiers: tiers.length > 0 ? tiers : undefined,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `Lỗi ${res.status}`);
+      setResult(json as ResearchResponse);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Lỗi không rõ");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function toggleTier(tier: EvidenceTier) {
+    setTiers((current) =>
+      current.includes(tier) ? current.filter((t) => t !== tier) : [...current, tier],
+    );
+  }
+
+  function toggleFinding(index: number) {
+    setChosen((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function handOff() {
+    if (!result || chosen.size === 0) return;
+
+    const findings = [...chosen].sort((a, b) => a - b).map((i) => result.findings[i]);
+    const usedIds = new Set(findings.flatMap((finding) => finding.paperIds));
+
+    sessionStorage.setItem(
+      HANDOFF_KEY,
+      JSON.stringify({
+        topic: result.query,
+        findings,
+        papers: result.papers.filter((paper) => usedIds.has(paper.id)),
+      }),
+    );
+    router.push("/soan-bai");
+  }
+
+  return (
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Nghiên cứu"
+        title="Tra cứu bằng chứng"
+        lede="Tìm trên PubMed và OpenAlex, rồi rút thành những phát hiện có thể dẫn thẳng vào bài. Mọi con số đều trích từ abstract gốc — bấm vào nguồn để đọc lại trước khi đăng."
+      />
+
+      <form onSubmit={run} className="space-y-5">
+        <div className="rule flex items-baseline gap-4 border-b pb-3">
+          <label htmlFor="q" className="eyebrow shrink-0">
+            Chủ đề
+          </label>
+          <input
+            id="q"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="creatine cho phụ nữ tuổi trung niên"
+            className="w-full bg-transparent font-serif text-2xl outline-none placeholder:text-ink/25"
+            autoComplete="off"
+          />
+        </div>
+
+        <p className="text-xs text-ink/45">
+          Nguồn dữ liệu là tiếng Anh — gõ từ khoá tiếng Anh cho kết quả sát hơn. Phát
+          hiện trả về vẫn bằng tiếng Việt.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <FilterGroup label="Năm">
+            {YEAR_CHOICES.map((choice) => (
+              <Chip
+                key={choice.value}
+                active={yearMin === choice.value}
+                onClick={() => setYearMin(choice.value)}
+              >
+                {choice.label}
+              </Chip>
+            ))}
+          </FilterGroup>
+
+          <FilterGroup label="Loại nghiên cứu">
+            {EVIDENCE_TIERS.filter((tier) => tier !== "khac").map((tier) => (
+              <Chip key={tier} active={tiers.includes(tier)} onClick={() => toggleTier(tier)}>
+                {TIER_LABEL[tier]}
+              </Chip>
+            ))}
+          </FilterGroup>
+        </div>
+
+        <Button type="submit" disabled={pending || query.trim().length < 2}>
+          {pending ? "Đang đọc nghiên cứu…" : "Tra cứu"}
+        </Button>
+      </form>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      {pending && (
+        <p className="text-sm text-ink/50">
+          Đang tìm trên PubMed và OpenAlex, rồi đọc abstract. Mất khoảng 20–40 giây.
+        </p>
+      )}
+
+      {result && (
+        <Results
+          result={result}
+          chosen={chosen}
+          onToggle={toggleFinding}
+          onCompose={handOff}
+        />
+      )}
+    </div>
+  );
+}
+
+function Results({
+  result,
+  chosen,
+  onToggle,
+  onCompose,
+}: {
+  result: ResearchResponse;
+  chosen: Set<number>;
+  onToggle: (index: number) => void;
+  onCompose: () => void;
+}) {
+  const papersById = new Map(result.papers.map((paper) => [paper.id, paper]));
+
+  return (
+    <div className="space-y-10">
+      <SourceLine result={result} />
+
+      {result.note && <EmptyNote>{result.note}</EmptyNote>}
+
+      {result.droppedCount > 0 && (
+        <ErrorNote>
+          Đã loại <Num>{result.droppedCount}</Num> phát hiện vì dẫn tới nghiên cứu không có
+          trong kết quả tìm được. Chỉ những phát hiện kiểm chứng được mới hiện ở đây.
+        </ErrorNote>
+      )}
+
+      {result.findings.length > 0 && (
+        <section className="space-y-5">
+          <div className="rule flex items-baseline justify-between border-b pb-3">
+            <Eyebrow>Phát hiện</Eyebrow>
+            <span className="text-xs text-ink/45">
+              đã chọn <Num>{chosen.size}</Num>/<Num>{result.findings.length}</Num>
+            </span>
+          </div>
+
+          <ul className="space-y-4">
+            {result.findings.map((finding, index) => (
+              <li key={index}>
+                <FindingCard
+                  finding={finding}
+                  papers={finding.paperIds
+                    .map((id) => papersById.get(id))
+                    .filter((paper): paper is Paper => paper !== undefined)}
+                  selected={chosen.has(index)}
+                  onToggle={() => onToggle(index)}
+                />
+              </li>
+            ))}
+          </ul>
+
+          <div className="rule flex items-center gap-4 border-t pt-5">
+            <Button onClick={onCompose} disabled={chosen.size === 0}>
+              Soạn bài với {chosen.size} phát hiện
+            </Button>
+            {chosen.size === 0 && (
+              <span className="text-xs text-ink/45">Chọn ít nhất một phát hiện.</span>
+            )}
+          </div>
+        </section>
+      )}
+
+      <PaperList papers={result.papers} />
+    </div>
+  );
+}
+
+function SourceLine({ result }: { result: ResearchResponse }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-ink/50">
+      {result.sources.map((source) => (
+        <span key={source.id}>
+          {source.label}{" "}
+          {source.error ? (
+            <span className="text-clay">không phản hồi</span>
+          ) : (
+            <>
+              <Num>{source.count}</Num> bài
+            </>
+          )}
+        </span>
+      ))}
+      <span>
+        · sau khi gộp: <Num>{result.papers.length}</Num> bài
+      </span>
+    </p>
+  );
+}
+
+function FindingCard({
+  finding,
+  papers,
+  selected,
+  onToggle,
+}: {
+  finding: Finding;
+  papers: Paper[];
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Card selected={selected}>
+      <div className="flex gap-4">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={selected}
+          aria-label={selected ? "Bỏ chọn phát hiện" : "Chọn phát hiện"}
+          className={`mt-1 size-4 shrink-0 border transition-colors ${
+            selected ? "border-ink bg-ink" : "border-ink/35 hover:border-ink/70"
+          }`}
+        />
+
+        <div className="min-w-0 flex-1 space-y-3">
+          <button type="button" onClick={onToggle} className="block w-full text-left">
+            <p className="font-serif text-lg leading-snug">{finding.claim}</p>
+          </button>
+
+          <p className="text-sm leading-relaxed text-ink/75">
+            <Quoted>{finding.evidence}</Quoted>
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <StrengthBadge strength={finding.strength} />
+            <span className="text-xs text-ink/50">Góc viết: {finding.angle}</span>
+          </div>
+
+          {finding.caveat && (
+            <p className="border-l-2 border-slate/35 py-0.5 pl-3 text-xs leading-relaxed text-slate">
+              Cần nói rõ khi đăng: {finding.caveat}
+            </p>
+          )}
+
+          <ul className="space-y-1 pt-1">
+            {papers.map((paper) => (
+              <li key={paper.id} className="text-xs leading-relaxed">
+                <a
+                  href={paper.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-amber underline decoration-amber/35 underline-offset-2 hover:decoration-amber"
+                >
+                  {paper.title}
+                </a>{" "}
+                <span className="text-ink/40">
+                  <Num>{paper.year ?? "?"}</Num>
+                  {paper.journal ? ` · ${paper.journal}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PaperList({ papers }: { papers: Paper[] }) {
+  if (papers.length === 0) return null;
+
+  return (
+    <details className="group">
+      <summary className="rule cursor-pointer border-t pt-5 text-sm text-ink/55 hover:text-ink">
+        Xem toàn bộ <Num>{papers.length}</Num> bài tìm được
+      </summary>
+
+      <ul className="mt-5 space-y-4">
+        {papers.map((paper) => (
+          <li key={paper.id} className="rule border-b pb-4 last:border-0">
+            <a
+              href={paper.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm leading-snug hover:text-amber"
+            >
+              {paper.title}
+            </a>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-xs text-ink/45">
+              <span>{TIER_LABEL[toTier(paper.studyTypes)]}</span>
+              <span>
+                <Num>{paper.year ?? "?"}</Num>
+              </span>
+              {paper.journal && <span>{paper.journal}</span>}
+              {paper.citedByCount !== null && (
+                <span>
+                  <Num>{paper.citedByCount}</Num> trích dẫn
+                </span>
+              )}
+              {paper.isOpenAccess && <span className="text-herb">đọc miễn phí</span>}
+              {!paper.abstract && <span className="text-ink/30">không có abstract</span>}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="eyebrow mr-1">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`border px-3 py-1 text-xs transition-colors ${
+        active
+          ? "border-ink text-ink"
+          : "border-ink/15 text-ink/55 hover:border-ink/40 hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
