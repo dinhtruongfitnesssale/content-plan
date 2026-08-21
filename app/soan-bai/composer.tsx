@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Button, Card, EmptyNote, ErrorNote, Eyebrow, Num, PageHeader } from "@/components/ui";
+import { WritingIndicator } from "@/components/writing-indicator";
 import { IllustrationPanel } from "./illustration";
 import { CTA_CHOICES, buildSources, type CtaKind } from "@/lib/compose";
 import { getStore } from "@/lib/store";
@@ -222,6 +223,11 @@ export function Composer() {
             ) : (
               <Button onClick={write}>{draft ? "Viết lại" : "Viết bài"}</Button>
             )}
+            {busy && (
+              <WritingIndicator
+                label={phase === "adjusting" ? "Đang chỉnh độ dài…" : "Đang viết…"}
+              />
+            )}
             {phase === "adjusting" && (
               <p className="text-xs text-slate">
                 Bài lệch khỏi khoảng {range.min}–{range.max} từ. Đang chỉnh lại một lượt.
@@ -256,7 +262,7 @@ export function Composer() {
                 </span>
               </div>
 
-              <FacebookPreview text={fullPost} streaming={busy} />
+              <FacebookPreview text={fullPost} streaming={busy} waiting={busy && !draft} />
 
               {phase === "done" && (
                 <div className="rule flex flex-wrap items-center gap-3 border-t pt-5">
@@ -300,8 +306,29 @@ export function Composer() {
   );
 }
 
-/** Khung xem trước mô phỏng cách Facebook hiển thị — dòng thưa, đoạn ngắn. */
-function FacebookPreview({ text, streaming }: { text: string; streaming: boolean }) {
+/**
+ * Khung xem trước mô phỏng cách Facebook hiển thị — dòng thưa, đoạn ngắn.
+ *
+ * `waiting` là quãng đã bấm nút nhưng chữ đầu tiên chưa về (model còn suy nghĩ).
+ * Quãng này có thể dài hàng chục giây nên phải có bút chạy, không để trang câm.
+ */
+function FacebookPreview({
+  text,
+  streaming,
+  waiting,
+}: {
+  text: string;
+  streaming: boolean;
+  waiting: boolean;
+}) {
+  if (waiting) {
+    return (
+      <Card>
+        <WritingIndicator size="lg" label="Đang đọc dẫn chứng và đặt câu mở…" />
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <div className="space-y-4 text-[0.9375rem] leading-[1.75] whitespace-pre-wrap">

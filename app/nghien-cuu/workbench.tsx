@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -14,6 +14,12 @@ import {
   StrengthBadge,
 } from "@/components/ui";
 import { EVIDENCE_TIERS, TIER_LABEL, toTier, type EvidenceTier } from "@/lib/research";
+import {
+  clearResearchCache,
+  minutesLeft,
+  readResearchCache,
+  writeResearchCache,
+} from "@/lib/research-cache";
 import { HANDOFF_KEY, type Finding, type Paper, type ResearchResponse } from "@/lib/types";
 
 const YEAR_CHOICES = [
@@ -33,12 +39,66 @@ export function ResearchWorkbench() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ResearchResponse | null>(null);
   const [chosen, setChosen] = useState<Set<number>>(new Set());
+  /** Mốc lượt tra cứu đang hiển thị — null nghĩa là chưa có gì để giữ. */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  // Trang "Hôm nay" chuyển chủ đề sang đây qua ?chu-de=
+  const didInit = useRef(false);
+
+  /**
+   * Lượt dựng đầu tiên: khôi phục kết quả cũ nếu còn hạn.
+   * Trang "Hôm nay" chuyển chủ đề sang đây qua ?chu-de= — chủ đề đó là ý định
+   * mới của người dùng nên thắng kết quả cũ, trừ khi trùng đúng chủ đề đã tra.
+   */
   useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+
     const seeded = params.get("chu-de");
-    if (seeded) setQuery(seeded);
+    const cached = readResearchCache();
+
+    if (cached && (!seeded || seeded === cached.query)) {
+      // localStorage chỉ đọc được ở trình duyệt nên phải đặt state sau khi
+      // hydrate xong — đọc sớm hơn thì server và client dựng ra hai cây khác nhau.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQuery(cached.query);
+      setYearMin(cached.yearMin);
+      setTiers(cached.tiers);
+      setResult(cached.result);
+      setChosen(new Set(cached.chosen));
+      setSavedAt(cached.savedAt);
+      return;
+    }
+
+    if (seeded) {
+      setQuery(seeded);
+      // Chủ đề khác hẳn — kết quả cũ không còn liên quan, dọn luôn.
+      if (cached) clearResearchCache();
+    }
   }, [params]);
+
+  /**
+   * Ghi lại mỗi khi kết quả hoặc lựa chọn đổi. Mốc hết hạn vẫn tính từ lượt
+   * tra cứu, nên bấm chọn thêm phát hiện không kéo dài thêm 10 phút.
+   */
+  useEffect(() => {
+    if (!result || savedAt === null) return;
+    writeResearchCache({
+      query: result.query,
+      yearMin,
+      tiers,
+      result,
+      chosen: [...chosen],
+      savedAt,
+    });
+  }, [result, chosen, savedAt, yearMin, tiers]);
+
+  function forget() {
+    clearResearchCache();
+    setResult(null);
+    setChosen(new Set());
+    setSavedAt(null);
+    setError(null);
+  }
 
   async function run(event: React.FormEvent) {
     event.preventDefault();
@@ -48,6 +108,10 @@ export function ResearchWorkbench() {
     setError(null);
     setResult(null);
     setChosen(new Set());
+    // Tra cứu chủ đề mới thì kết quả cũ hết giá trị — dọn ngay, đừng để lỡ
+    // tải lại trang giữa chừng lại thấy kết quả của chủ đề trước.
+    setSavedAt(null);
+    clearResearchCache();
 
     try {
       const res = await fetch("/api/research", {
@@ -63,6 +127,7 @@ export function ResearchWorkbench() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `Lỗi ${res.status}`);
       setResult(json as ResearchResponse);
+      setSavedAt(Date.now());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Lỗi không rõ");
     } finally {
@@ -165,6 +230,8 @@ export function ResearchWorkbench() {
         </p>
       )}
 
+      {result && savedAt !== null && <KeptNote savedAt={savedAt} onForget={forget} />}
+
       {result && (
         <Results
           result={result}
@@ -173,6 +240,32 @@ export function ResearchWorkbench() {
           onCompose={handOff}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Cho biết kết quả đang được giữ và giữ tới bao giờ.
+ *
+ * Nói rõ số phút còn lại thay vì im lặng: người dùng cần biết cái mình đang
+ * nhìn là kết quả vừa tra hay kết quả khôi phục từ lượt trước.
+ */
+function KeptNote({ savedAt, onForget }: { savedAt: number; onForget: () => void }) {
+  const left = minutesLeft(savedAt);
+
+  return (
+    <div className="rule flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+      <p className="text-xs text-ink/45">
+        Kết quả được giữ lại — tải lại trang vẫn còn, tự xoá sau{" "}
+        <Num>{left}</Num> phút nữa. Tra chủ đề khác là thay luôn.
+      </p>
+      <button
+        type="button"
+        onClick={onForget}
+        className="text-xs text-ink/45 underline decoration-ink/20 underline-offset-2 transition-colors hover:text-ink"
+      >
+        Xoá kết quả
+      </button>
     </div>
   );
 }

@@ -100,3 +100,96 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 9999px;
   background: var(--color-ink);
 }
+
+/* ---------------------------------------------------------------
+   Cây bút đang viết. Bút màu mực, nét gạch chân amber (đường kẻ mảnh
+   — một trong 5 chỗ được dùng amber). Xem components/writing-indicator.tsx
+   --------------------------------------------------------------- */
+
+.pen-track {
+  position: relative;
+  display: inline-block;
+  width: 4.5rem;
+  height: 1.375rem;
+  flex-shrink: 0;
+}
+.pen-track-lg {
+  width: 7rem;
+  height: 2rem;
+}
+
+/* Nét chữ bút vừa để lại: mọc dài theo bút rồi tan đi cùng lượt. */
+.pen-ink {
+  position: absolute;
+  left: 0;
+  bottom: 0.125rem;
+  height: 1px;
+  background-color: var(--color-amber);
+  animation: pen-ink 1.9s ease-in-out infinite;
+}
+
+.pen-glide {
+  position: absolute;
+  left: 0;
+  bottom: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-ink);
+  animation: pen-glide 1.9s ease-in-out infinite;
+}
+.pen-track-lg .pen-glide {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Bút trượt sang phải, hơi nhấp nhô như nét bút thật, rồi nhấc về đầu dòng. */
+@keyframes pen-glide {
+  0%   { transform: translate(0, 0) rotate(-6deg); }
+  45%  { transform: translate(2.6rem, -0.09rem) rotate(-2deg); }
+  70%  { transform: translate(3.5rem, 0) rotate(-6deg); }
+  78%  { transform: translate(3.5rem, -0.35rem) rotate(-14deg); opacity: 0.45; }
+  92%  { transform: translate(0, -0.35rem) rotate(-14deg); opacity: 0.45; }
+  100% { transform: translate(0, 0) rotate(-6deg); }
+}
+.pen-track-lg .pen-glide {
+  animation-name: pen-glide-lg;
+}
+@keyframes pen-glide-lg {
+  0%   { transform: translate(0, 0) rotate(-6deg); }
+  45%  { transform: translate(4rem, -0.09rem) rotate(-2deg); }
+  70%  { transform: translate(5.5rem, 0) rotate(-6deg); }
+  78%  { transform: translate(5.5rem, -0.4rem) rotate(-14deg); opacity: 0.45; }
+  92%  { transform: translate(0, -0.4rem) rotate(-14deg); opacity: 0.45; }
+  100% { transform: translate(0, 0) rotate(-6deg); }
+}
+
+@keyframes pen-ink {
+  0%   { width: 0.35rem; opacity: 0.9; }
+  70%  { width: 4.25rem; opacity: 0.9; }
+  78%  { width: 4.25rem; opacity: 0.55; }
+  92%  { width: 0; opacity: 0; }
+  100% { width: 0.35rem; opacity: 0.9; }
+}
+.pen-track-lg .pen-ink {
+  animation-name: pen-ink-lg;
+}
+@keyframes pen-ink-lg {
+  0%   { width: 0.5rem; opacity: 0.9; }
+  70%  { width: 6.75rem; opacity: 0.9; }
+  78%  { width: 6.75rem; opacity: 0.55; }
+  92%  { width: 0; opacity: 0; }
+  100% { width: 0.5rem; opacity: 0.9; }
+}
+
+/* Người tắt hiệu ứng chuyển động thì bút đứng yên, chỉ nhấp nháy rất nhẹ. */
+@media (prefers-reduced-motion: reduce) {
+  .pen-glide,
+  .pen-ink {
+    animation: pen-rest 2s ease-in-out infinite;
+  }
+  .pen-ink { width: 2.5rem; }
+  @keyframes pen-rest {
+    0%, 100% { opacity: 0.9; }
+    50%      { opacity: 0.35; }
+  }
+}
