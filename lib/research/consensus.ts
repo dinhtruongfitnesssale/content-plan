@@ -66,11 +66,19 @@ export function isConsensusEnabled(): boolean {
   return Boolean(process.env.CONSENSUS_API_KEY);
 }
 
-/** Nhãn study_types của Consensus tương ứng với từng bậc bằng chứng. */
+/**
+ * Nhãn study_types của Consensus tương ứng với từng bậc bằng chứng.
+ *
+ * Tham số request dùng **dấu cách**, không phải gạch nối: "systematic review",
+ * không phải "systematic-review". Gửi sai thì cả lượt gọi trả 422 và Consensus
+ * rụng khỏi kết quả — chỉ lộ ra khi người dùng bật bộ lọc bậc bằng chứng.
+ * Riêng "meta-analysis" và "case-control study" vốn đã có gạch nối trong từ.
+ * Kiểm bằng dữ liệu thật 21/08/2026; danh sách hợp lệ nằm trong thân lỗi 422.
+ */
 const TIER_STUDY_TYPES: Record<EvidenceTier, string[]> = {
-  "tong-quan-he-thong": ["meta-analysis", "systematic-review", "literature-review"],
+  "tong-quan-he-thong": ["meta-analysis", "systematic review", "literature review"],
   "thu-nghiem-ngau-nhien": ["rct"],
-  "quan-sat": ["case-study", "non-rct-experimental", "non-rct-observational-study"],
+  "quan-sat": ["cohort study", "case-control study", "cross-sectional study"],
   khac: [],
 };
 

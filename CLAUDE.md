@@ -60,9 +60,12 @@ Nút chính là **nền ink, chữ paper** — không phải nền amber.
 Mọi nguồn đều bị coi là có thể chết bất kỳ lúc nào — không bao giờ dùng `Promise.all`.
 
 **Đã kiểm bằng dữ liệu thật (19/08/2026):**
-- Consensus `study_type` trong response dùng **dấu cách** (`"literature review"`)
-  còn tham số request dùng **gạch nối** (`"literature-review"`). Phải chuẩn hoá
+- Consensus dùng **dấu cách** ở CẢ HAI chiều: `study_type` trong response
+  (`"literature review"`) lẫn tham số `study_types` khi gửi đi. Vẫn phải chuẩn hoá
   trước khi tra bảng nhãn, nếu không mọi loại đều rơi xuống bậc "khác".
+  (Sửa 21/08/2026: trước đây ghi là request dùng gạch nối — sai. Gửi
+  `"systematic-review"` thì cả lượt gọi trả **422** và Consensus rụng khỏi kết
+  quả, chỉ lộ ra khi bật bộ lọc bậc bằng chứng. Thân lỗi 422 liệt kê đủ nhãn hợp lệ.)
 - `sample_size` và `population_type` **có thể vắng hẳn** khỏi response (đã thấy
   với bài tổng quan tường thuật). Đừng coi là chắc có.
 - `url` của Consensus trỏ về `consensus.app/papers/…`. Ưu tiên `https://doi.org/{doi}`
