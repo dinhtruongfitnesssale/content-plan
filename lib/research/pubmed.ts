@@ -74,7 +74,22 @@ async function esearch(query: string, opts: SearchOptions): Promise<string[]> {
   params.set("term", buildTerm(query, opts));
   params.set("retmode", "json");
   params.set("retmax", String(opts.limit ?? 12));
+  // LUÔN xếp theo độ liên quan, kể cả khi người gọi muốn bảng tin mới nhất.
+  //
+  // `sort=date` nghe có vẻ đúng cho bảng tin nhưng thực tế hỏng: nó vứt bỏ
+  // hoàn toàn thứ hạng liên quan, nên với một truy vấn rộng ta nhận về 8 bài
+  // MỚI NHẤT trong hàng nghìn bài khớp lỏng lẻo — đã thấy tận mắt: mảng thực
+  // phẩm bổ sung trả về di truyền học nấm men và dẫn xuất quinoline.
+  // Cách đúng là để `reldate` chặn cửa sổ thời gian, PubMed chọn bài sát nhất
+  // trong cửa sổ đó, rồi `rank()` ở tầng trên xếp lại theo ngày.
   params.set("sort", "relevance");
+
+  // `reldate` + `datetype=pdat` là cách duy nhất của PubMed để nói "N ngày gần
+  // đây"; khoảng `[dp]` chỉ nhận đến mức năm nên không thay thế được.
+  if (opts.days) {
+    params.set("reldate", String(opts.days));
+    params.set("datetype", "pdat");
+  }
 
   const res = await fetch(`${EUTILS}/esearch.fcgi?${params}`, {
     signal: opts.signal,
@@ -171,6 +186,7 @@ function toPaper(article: Record<string, unknown>): Paper | null {
     abstract: readAbstract(art.Abstract),
     authors: readAuthors(art.AuthorList),
     year,
+    publishedOn: readPublishedOn(art.ArticleDate, pubDate),
     journal: text(journalNode.Title) || text(journalNode.ISOAbbreviation) || null,
     doi: readDoi(article, art),
     pmid,
@@ -184,6 +200,59 @@ function toPaper(article: Record<string, unknown>): Paper | null {
     takeaway: null,
     sampleSize: null,
   };
+}
+
+const MONTHS = [
+  "jan", "feb", "mar", "apr", "may", "jun",
+  "jul", "aug", "sep", "oct", "nov", "dec",
+];
+
+/**
+ * Ngày xuất bản ISO, ưu tiên <ArticleDate> rồi mới tới <PubDate>.
+ *
+ * <ArticleDate> là ngày lên mạng và luôn đủ ngày-tháng-năm. <PubDate> là ngày
+ * của số tạp chí giấy: hay chỉ có năm, và tháng thì ghi bằng chữ ("Jul") chứ
+ * không phải số. Bài điện tử ra trước bản in nhiều tháng, nên lấy <PubDate>
+ * cho một bảng tin "mới nhất" là xếp sai thứ tự.
+ *
+ * Không đủ ngày thì trả null chứ không độn "-01": ngày bịa sẽ lẫn vào ngày
+ * thật khi xếp hạng, mà `year` vẫn còn đó để dùng làm mốc thô.
+ */
+function readPublishedOn(articleDate: unknown, pubDate: Record<string, unknown>): string | null {
+  const primary = asArray(articleDate)[0];
+  const parts = [primary, pubDate].filter(Boolean) as Record<string, unknown>[];
+
+  for (const part of parts) {
+    const year = text(part.Year);
+    if (!/^\d{4}$/.test(year)) continue;
+
+    const month = readMonth(text(part.Month));
+    if (!month) continue;
+
+    // Kiểm chuỗi THÔ trước khi đệm số 0. `"".padStart(2, "0")` ra "00", lọt
+    // qua mọi phép thử hai chữ số và đẻ ra ngày "2026-07-00" — <PubDate> chỉ
+    // có năm với tháng là chuyện rất thường.
+    const rawDay = text(part.Day);
+    if (!/^\d{1,2}$/.test(rawDay)) continue;
+
+    const day = Number(rawDay);
+    if (day < 1 || day > 31) continue;
+
+    return `${year}-${month}-${String(day).padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+/** PubMed ghi tháng bằng số ("7") hoặc bằng chữ viết tắt tiếng Anh ("Jul"). */
+function readMonth(raw: string): string | null {
+  if (/^\d{1,2}$/.test(raw)) {
+    const num = Number(raw);
+    return num >= 1 && num <= 12 ? String(num).padStart(2, "0") : null;
+  }
+
+  const at = MONTHS.indexOf(raw.slice(0, 3).toLowerCase());
+  return at === -1 ? null : String(at + 1).padStart(2, "0");
 }
 
 /**
@@ -328,9 +397,29 @@ function text(node: unknown): string {
   return "";
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+/**
+ * Bóc thẻ inline và giải mã thực thể HTML.
+ *
+ * Phải tự giải mã ở đây dù parser đã bật `processEntities`: tiêu đề và
+ * abstract nằm trong `stopNodes` nên parser trả về chuỗi thô, không đụng vào.
+ * Bỏ bước này thì độc giả thấy "CrossFit&#xae; athletes" ngay trên bảng tin —
+ * đã gặp thật với PMID của một bài tháng 7/2026.
+ */
 function stripTags(value: string): string {
   return value
     .replace(/<[^>]*>/g, "")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&([a-z]+);/gi, (whole, name) => NAMED_ENTITIES[name.toLowerCase()] ?? whole)
     .replace(/\s+/g, " ")
     .trim();
 }

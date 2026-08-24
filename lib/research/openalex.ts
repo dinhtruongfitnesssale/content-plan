@@ -24,9 +24,17 @@ export const openalex: Provider = {
     if (email) params.set("mailto", email);
 
     const filters: string[] = [];
-    if (opts.yearMin) filters.push(`from_publication_date:${opts.yearMin}-01-01`);
+    // `days` là mốc hẹp hơn `yearMin` nên nó thắng — hai cái cùng gửi thì
+    // OpenAlex nhận cả hai và lấy giao, tức là mốc năm trở thành thừa.
+    if (opts.days) filters.push(`from_publication_date:${daysAgo(opts.days)}`);
+    else if (opts.yearMin) filters.push(`from_publication_date:${opts.yearMin}-01-01`);
     if (opts.yearMax) filters.push(`to_publication_date:${opts.yearMax}-12-31`);
     if (filters.length > 0) params.set("filter", filters.join(","));
+
+    // Cố ý KHÔNG đặt `sort=publication_date:desc` cho bảng tin: xếp theo ngày
+    // ở phía nguồn là vứt bỏ thứ hạng liên quan, và một truy vấn rộng sẽ trả
+    // về bài mới nhất thay vì bài đúng chủ đề. Cửa sổ ngày ở trên đã chặn đủ;
+    // việc xếp theo ngày để `rank()` ở tầng trên làm, sau khi đã gộp nguồn.
 
     const res = await fetch(`${API}?${params}`, {
       signal: opts.signal,
@@ -44,6 +52,7 @@ const SELECT = [
   "doi",
   "title",
   "publication_year",
+  "publication_date",
   "abstract_inverted_index",
   "cited_by_count",
   "type",
@@ -58,6 +67,7 @@ type OpenAlexWork = {
   doi?: string | null;
   title?: string | null;
   publication_year?: number | null;
+  publication_date?: string | null;
   abstract_inverted_index?: Record<string, number[]> | null;
   cited_by_count?: number | null;
   type?: string | null;
@@ -84,6 +94,7 @@ function toPaper(work: OpenAlexWork): Paper | null {
       .map((a) => a.author?.display_name?.trim())
       .filter((name): name is string => Boolean(name)),
     year: work.publication_year ?? null,
+    publishedOn: readDate(work.publication_date),
     journal: work.primary_location?.source?.display_name ?? null,
     doi,
     pmid,
@@ -136,4 +147,19 @@ function guessStudyTypes(work: OpenAlexWork, title: string): string[] {
   if (types.length === 0 && work.type === "review") types.push("Review");
 
   return types;
+}
+
+/** Mốc "N ngày trước" dạng YYYY-MM-DD, đúng định dạng filter của OpenAlex. */
+function daysAgo(days: number): string {
+  const at = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return at.toISOString().slice(0, 10);
+}
+
+/**
+ * OpenAlex trả `publication_date` đã đúng dạng ISO, nhưng vẫn kiểm lại hình
+ * dạng: một chuỗi lệch định dạng lọt vào sẽ làm hỏng phép so sánh chuỗi mà
+ * `rank()` dùng để xếp bài mới nhất, và hỏng im lặng — chỉ thấy thứ tự lạ.
+ */
+function readDate(value: string | null | undefined): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }

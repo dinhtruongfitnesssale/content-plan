@@ -7,6 +7,7 @@ import {
   type Provider,
   type ProviderId,
   type SearchOptions,
+  type SortMode,
   tierRank,
   toTiers,
   toTier,
@@ -66,7 +67,7 @@ export async function searchPapers(
     }
   });
 
-  const papers = rank(dedupe(collected), opts.tiers);
+  const papers = rank(dedupe(collected), opts.tiers, opts.sort ?? "evidence", opts.days);
   return { papers, sources };
 }
 
@@ -119,6 +120,9 @@ function merge(a: Paper, b: Paper): Paper {
     abstract: longest(primary.abstract, other.abstract),
     authors: primary.authors.length >= other.authors.length ? primary.authors : other.authors,
     year: primary.year ?? other.year,
+    // Bên nào có ngày đầy đủ thì thắng, kể cả khi bên đó không phải nguồn
+    // chính: PubMed rất hay chỉ có năm cho bài đăng trước bản in.
+    publishedOn: primary.publishedOn ?? other.publishedOn,
     journal: primary.journal ?? other.journal,
     doi: primary.doi ?? other.doi,
     pmid: primary.pmid ?? other.pmid,
@@ -138,30 +142,81 @@ function longest(a: string | null, b: string | null): string | null {
 }
 
 /**
- * Xếp hạng theo bậc bằng chứng trước, rồi mới đến năm và lượt trích dẫn.
- * Bài đăng cần dẫn chứng mạnh chứ không cần nghiên cứu mới nhất — một
+ * Lọc theo bậc bằng chứng rồi xếp hạng theo chế độ đang chọn.
+ *
+ * `evidence` (mặc định): bậc bằng chứng trước, rồi mới đến năm và lượt trích
+ * dẫn. Bài đăng cần dẫn chứng mạnh chứ không cần nghiên cứu mới nhất — một
  * phân tích gộp năm 2019 đáng tin hơn một nghiên cứu quan sát năm 2025.
+ *
+ * `recent`: ngày xuất bản trước. Bảng tin trả lời câu hỏi khác hẳn — "tuần
+ * này có gì mới" — nên xếp theo bậc ở đây sẽ chôn đúng thứ người ta vào xem.
+ * Bậc bằng chứng vẫn là tiêu chí phụ, và bộ lọc tháp vẫn chạy y như cũ.
  */
-function rank(papers: Paper[], tiers?: EvidenceTier[]): Paper[] {
+function rank(
+  papers: Paper[],
+  tiers?: EvidenceTier[],
+  sort: SortMode = "evidence",
+  days?: number,
+): Paper[] {
   const wanted = tiers?.length && !tiers.includes("other") ? new Set(tiers) : null;
 
   // Lọc theo MỌI bậc bài khớp, không chỉ bậc đại diện — nếu không thì chọn
   // "Systematic Review" sẽ ra rỗng, vì phần lớn tổng quan hệ thống đồng thời
   // mang nhãn phân tích gộp và bị quy lên bậc trên.
-  const filtered = wanted
+  let filtered = wanted
     ? papers.filter((paper) => toTiers(paper.studyTypes).some((tier) => wanted.has(tier)))
     : papers;
 
+  // Chặn lại cửa sổ ngày một lần nữa ở tầng này, sau khi đã gộp nguồn.
+  //
+  // Không thừa: hai nguồn hiểu "ngày xuất bản" khác nhau. PubMed lọc theo ngày
+  // của số tạp chí, nhưng ngày ta HIỆN ra là ngày lên mạng — mà bài điện tử ra
+  // trước bản in cả năm là chuyện thường. Kết quả là bài ghi 07/2025 lọt vào
+  // bảng tin "90 ngày gần đây" và trông như lỗi. Ai thấy cũng nghĩ app sai,
+  // và họ đúng: cái hiện ra phải khớp với cái vừa hỏi.
+  if (days) {
+    const cutoff = dayNumber(new Date(Date.now() - days * 86_400_000));
+    filtered = filtered.filter((paper) => dateKey(paper) >= cutoff);
+  }
+
   return filtered.sort((a, b) => {
-    const byTier = tierRank(toTier(a.studyTypes)) - tierRank(toTier(b.studyTypes));
-    if (byTier !== 0) return byTier;
+    if (sort === "recent") {
+      const byDate = dateKey(b) - dateKey(a);
+      if (byDate !== 0) return byDate;
+    } else {
+      const byTier = tierRank(toTier(a.studyTypes)) - tierRank(toTier(b.studyTypes));
+      if (byTier !== 0) return byTier;
+    }
 
     const byAbstract = Number(Boolean(b.abstract)) - Number(Boolean(a.abstract));
     if (byAbstract !== 0) return byAbstract;
 
-    const byYear = (b.year ?? 0) - (a.year ?? 0);
-    if (byYear !== 0) return byYear;
+    if (sort === "recent") {
+      const byTier = tierRank(toTier(a.studyTypes)) - tierRank(toTier(b.studyTypes));
+      if (byTier !== 0) return byTier;
+    } else {
+      const byYear = (b.year ?? 0) - (a.year ?? 0);
+      if (byYear !== 0) return byYear;
+    }
 
     return (b.citedByCount ?? 0) - (a.citedByCount ?? 0);
   });
+}
+
+/**
+ * Mốc thời gian để so sánh, dạng số YYYYMMDD.
+ *
+ * Bài chỉ có năm được quy về **cuối năm** chứ không phải đầu năm: một bài ghi
+ * "2026" mà đang ở giữa năm 2026 thì nhiều khả năng vừa ra, đẩy nó xuống dưới
+ * mọi bài tháng 1 có ngày đầy đủ là xếp sai. Không có gì cả thì về 0 — xuống
+ * cuối danh sách, đúng chỗ của một bài không rõ ngày trong bảng tin.
+ */
+function dateKey(paper: Paper): number {
+  if (paper.publishedOn) return Number(paper.publishedOn.replace(/-/g, ""));
+  return paper.year ? paper.year * 10000 + 1231 : 0;
+}
+
+/** Cùng dạng số YYYYMMDD như `dateKey`, để so sánh được với nhau. */
+function dayNumber(at: Date): number {
+  return at.getFullYear() * 10000 + (at.getMonth() + 1) * 100 + at.getDate();
 }

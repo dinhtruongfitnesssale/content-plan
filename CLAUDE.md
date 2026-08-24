@@ -83,6 +83,41 @@ Mọi nguồn đều bị coi là có thể chết bất kỳ lúc nào — khô
   `pubmed.ts` phải kiểm tra thân phản hồi, không chỉ `res.ok` — đúng kiểu hỏng im
   lặng đã khiến Europe PMC bị loại.
 
+### Bảng tin "Mới nhất" — `/moi-nhat`
+
+Trả lời câu hỏi ngược với trang Nghiên cứu: không phải "tìm bằng chứng cho chủ đề
+này" mà "mấy tuần nay có gì mới đáng đọc". `lib/watchlist.ts` khai sẵn các mảng
+theo dõi thường trực; thêm một mục vào `WATCHLIST` là bảng tin có thêm một mảng.
+
+**Cố ý không gọi model.** Mỗi lượt quét đi qua bảy mảng — cho model đọc hết thì
+vừa lâu vừa tốn, mà rào chắn chống bịa số liệu lại phải dựng thêm một lần nữa.
+Muốn có phát hiện tiếng Việt thì bấm "Tra cứu sâu", đường đó đi qua
+`/api/research` nơi `verifyFindings()` đã đứng sẵn. Vì vậy tiêu đề bài trong
+bảng tin để nguyên tiếng Anh — dịch bằng code thì sai nghĩa chuyên môn.
+
+`searchPapers` nhận thêm `days` (cửa sổ ngày) và `sort`. `sort: "recent"` chỉ đổi
+cách `rank()` xếp — **không** đổi cách các nguồn xếp, và đây là chỗ dễ làm sai nhất:
+
+- Đặt `sort=date` cho PubMed hay `sort=publication_date:desc` cho OpenAlex nghe
+  có vẻ đúng nhưng hỏng nặng: nó vứt bỏ hoàn toàn thứ hạng liên quan, nên với
+  truy vấn rộng ta nhận về N bài MỚI NHẤT trong hàng nghìn bài khớp lỏng lẻo.
+  Đã thấy tận mắt: mảng thực phẩm bổ sung trả về di truyền học nấm men và dẫn
+  xuất quinoline. Cách đúng là để cửa sổ ngày chặn phạm vi, nguồn chọn bài sát
+  nhất trong đó, rồi `rank()` xếp lại theo ngày.
+- `rank()` chặn lại cửa sổ ngày **một lần nữa** sau khi gộp nguồn. Không thừa:
+  PubMed lọc theo ngày số tạp chí, nhưng ngày ta hiện ra là `<ArticleDate>` (ngày
+  lên mạng) — bài điện tử ra trước bản in cả năm là chuyện thường, nên bài ghi
+  07/2025 lọt vào bảng tin "90 ngày gần đây". Cái hiện ra phải khớp cái vừa hỏi.
+
+`Paper.publishedOn` là ngày ISO `YYYY-MM-DD`, chỉ nhận khi đủ ngày-tháng-năm;
+thiếu thì null chứ không độn `-01`, vì ngày bịa sẽ lẫn vào ngày thật khi xếp hạng.
+Bài chỉ có năm được `dateKey()` quy về **cuối năm**, không phải đầu năm.
+
+Bài rất mới hay mang nhãn "Other": PubMed gán PublicationType/MeSH sau khi bài ra
+vài tuần. Đây là giới hạn thật của dữ liệu, giao diện nói thẳng ra chứ không giấu.
+Bật bộ lọc bậc là chỉ còn bài đã được gán nhãn — đo thật ngày 24/08/2026: cửa sổ
+90 ngày, bảy mảng, không lọc ra 84 bài (60 "Other"), lọc RCT ra 33 bài (0 "Other").
+
 ### Tầng LLM — `lib/llm/`
 
 Mọi lượt gọi model đi qua `llm(role)`. Route handler **không bao giờ** import SDK
@@ -168,6 +203,7 @@ Prompt cấm model viết tên tạp chí hay năm nghiên cứu vào thân bài
 
 ```bash
 npx tsx scripts/thu-nghien-cuu.ts "creatine women"   # chạy thật tầng nghiên cứu, không mock
+npx tsx scripts/thu-moi-nhat.ts thuc-pham-bo-sung 30 # bảng tin: ngày, thứ tự, cửa sổ
 npx tsx scripts/thu-dem-tu.ts                        # kiểm bộ đếm từ tiếng Việt
 npm run build                                         # bắt lỗi Suspense / server-client boundary
 ```

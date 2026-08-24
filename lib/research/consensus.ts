@@ -140,6 +140,11 @@ function toPaper(result: QueryResult): Paper | null {
     abstract: result.abstract?.trim() || null,
     authors: result.authors ?? [],
     year: result.publish_year ?? yearFromDate(result.publish_date),
+    // `publish_date` hay chỉ có năm ("2024") — chỉ nhận khi đủ ngày-tháng-năm,
+    // vì trường này dùng để xếp bài mới nhất.
+    publishedOn: /^\d{4}-\d{2}-\d{2}$/.test(result.publish_date ?? "")
+      ? result.publish_date!
+      : null,
     journal: result.journal_name ?? result.publisher_name ?? null,
     doi,
     pmid: null,

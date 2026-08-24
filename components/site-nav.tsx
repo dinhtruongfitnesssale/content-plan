@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/", label: "Hôm nay" },
+  { href: "/moi-nhat", label: "Mới nhất" },
   { href: "/nghien-cuu", label: "Nghiên cứu" },
   { href: "/soan-bai", label: "Soạn bài" },
   { href: "/thu-vien", label: "Thư viện" },

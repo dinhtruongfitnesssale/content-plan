@@ -7,6 +7,13 @@ export type Paper = {
   abstract: string | null;
   authors: string[];
   year: number | null;
+  /**
+   * Ngày xuất bản dạng ISO `YYYY-MM-DD`, khi nguồn cho đủ ngày tháng.
+   * Chỉ có `year` thì không xếp được "mới nhất": một năm có hàng nghìn bài,
+   * mà bảng tin cần biết bài nào vừa ra tuần này. Consensus chỉ trả năm nên
+   * trường này của nó luôn null — khi gộp, bản ghi nào có ngày thì thắng.
+   */
+  publishedOn: string | null;
   journal: string | null;
   doi: string | null;
   pmid: string | null;
@@ -30,8 +37,23 @@ export type SearchOptions = {
   yearMax?: number;
   /** Chỉ lấy bài thuộc các bậc bằng chứng này. */
   tiers?: EvidenceTier[];
+  /**
+   * Chỉ lấy bài trong bao nhiêu ngày gần đây. Dùng cho bảng tin "Mới nhất",
+   * nơi mốc thời gian tính bằng tuần chứ không phải bằng năm.
+   */
+  days?: number;
+  /**
+   * Xếp theo cái gì.
+   * - `evidence` (mặc định): bậc bằng chứng trước, năm sau — dùng khi tra cứu
+   *   để viết bài, vì bài đăng cần dẫn chứng mạnh chứ không cần bài mới.
+   * - `recent`: ngày xuất bản trước — dùng cho bảng tin, nơi câu hỏi là
+   *   "tuần này có gì mới", không phải "bằng chứng nào chắc nhất".
+   */
+  sort?: SortMode;
   signal?: AbortSignal;
 };
+
+export type SortMode = "evidence" | "recent";
 
 export type Provider = {
   id: ProviderId;
