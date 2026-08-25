@@ -202,9 +202,23 @@ Con số 32.000 đến từ trần độ dài 2.000 từ: một âm tiết tiế
 nên bài 2.000 từ là ~5.800 token chữ cộng ~6.500 token nghĩ. Nâng trần **không tốn
 thêm tiền** — chỉ token thực sự sinh ra mới bị tính — nên để dư là đúng.
 
-`maxDuration` của `/api/compose` là **600 giây**, không phải 300. Đây là trần cứng
-theo đồng hồ mà streaming không cứu được: bài 2.000 từ mất 200–320 giây, và lượt
-chỉnh lại độ dài là một lượt gọi RIÊNG viết lại cả bài, tốn ngang lượt đầu.
+`maxDuration` của `/api/compose` là **300 giây, và đó là trần của gói Hobby trên
+Vercel** — không phải con số ta chọn. Đặt cao hơn thì build đổ ngay ở khâu deploy:
+"maxDuration must be between 1 and 300 for plan hobby". Đã thử 600 và nhận đúng lỗi
+đó (26/08/2026). Gói Pro cho tới 800; chỉ khi lên gói đó mới nâng số này.
+
+Đây là trần cứng theo đồng hồ mà streaming không cứu được, nên độ sâu suy nghĩ phải
+lùi để lọt vào: `effortFor()` trong route hạ effort xuống `"medium"` khi bài dài hơn
+**1.200 từ**. Lý do là ở effort `"high"` phần token nghĩ nhiều gần bằng phần chữ —
+bài 2.000 từ thành ~12.300 token, ở 40–60 token/giây là 205–307 giây, vắt ngang mép
+tường. Đo thật ngày 26/08/2026 ở `"medium"`, mục tiêu 2.000 từ, bốn dẫn chứng: chữ
+đầu tiên về sau 8 giây, viết xong sau **100 giây**, ra 1.734 từ — trong biên ±15% nên
+không tốn thêm lượt chỉnh. Lượt chỉnh lại độ dài là
+một lượt gọi RIÊNG viết lại CẢ bài nên cũng tốn ngang lượt đầu — nó đo effort từ số
+từ của bản nháp, không mặc định "chỉnh thì nhanh".
+
+Effort đi qua `StreamRequest.effort`; route quyết định chứ không phải tầng LLM, vì
+chỉ route mới biết trần đồng hồ của mình là bao nhiêu.
 
 **`lib/llm/gemini.ts` chưa từng chạy thật** — viết theo tài liệu Interactions API,
 không có key để kiểm chứng. Hình dạng `step.delta` khi streaming là chỗ đáng ngờ
@@ -236,9 +250,12 @@ model càng bám số từ kém, nên giữ ±10% ở đó là tự chuốc mộ
 mỗi lần. Bài ngắn giữ nguyên ±10% có chủ ý: mốc "Ngắn" 80 từ hứa hiện trọn không
 cần bấm "Xem thêm", nới biên ở đó là phá lời hứa đó.
 
-`MAX_WORDS` là 2.000. Nâng tiếp thì phải sửa cả `max_tokens`, `maxDuration`, và
-trần ký tự của `draft` ở mode refine (`route.ts`) — bốn con số này đi cùng nhau,
-đổi một cái mà quên ba cái kia thì bài bị cắt giữa câu hoặc nút "Chỉnh lại" báo 400.
+`MAX_WORDS` là 2.000, và đó là **trần theo đồng hồ chứ không phải theo token**: ở
+gói Hobby, route chỉ có 300 giây. Nâng tiếp thì phải sửa cả `max_tokens`,
+`EFFORT_WORD_CAP`, trần ký tự của `draft` ở mode refine (`route.ts`), và trước hết
+là `maxDuration` — mà `maxDuration` chỉ nâng được sau khi đổi gói Vercel. Năm con số
+này đi cùng nhau; đổi một cái mà quên bốn cái kia thì bài bị cắt giữa câu, nút
+"Chỉnh lại" báo 400, hoặc deploy đổ.
 
 ### Lưu trữ
 

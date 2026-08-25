@@ -1,16 +1,43 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { llm } from "@/lib/llm";
+import { llm, type Effort } from "@/lib/llm";
 import { composePrompt, refinePrompt, roundupPrompt, type CtaKind } from "@/lib/compose";
-import { MAX_WORDS, MIN_WORDS } from "@/lib/words";
+import { countWords, MAX_WORDS, MIN_WORDS } from "@/lib/words";
 import { voiceById, DEFAULT_VOICE_ID, type Voice } from "@/lib/voices";
 
 export const runtime = "nodejs";
-// Trần cứng theo đồng hồ, streaming không cứu được. Bài 2.000 từ là ~12.000
-// token, với tốc độ Opus 40–60 token/giây là 200–320 giây — sát mép 300 giây
-// cũ, tức thỉnh thoảng đứt SAU KHI đã trả tiền cho lượt gọi. 600 giây cho đủ
-// biên, kể cả lượt chỉnh lại độ dài (lượt đó viết lại cả bài, tốn ngang lượt đầu).
-export const maxDuration = 600;
+
+/**
+ * Trần cứng theo đồng hồ, streaming không cứu được.
+ *
+ * 300 giây là **trần của gói Hobby trên Vercel**, không phải con số ta chọn:
+ * đặt cao hơn thì build đổ ngay với "maxDuration must be between 1 and 300 for
+ * plan hobby". Đã thử 600 và nhận đúng lỗi đó (26/08/2026). Lên gói Pro thì
+ * trần là 800 — chỉ khi đó mới nâng số này, và nâng xong thì `EFFORT_WORD_CAP`
+ * bên dưới nới theo được.
+ */
+export const maxDuration = 300;
+
+/**
+ * Trên ngưỡng này thì hạ độ sâu suy nghĩ xuống "medium".
+ *
+ * Không phải để tiết kiệm tiền mà để lọt vào 300 giây. Ở effort "high" phần
+ * token suy nghĩ nhiều gần bằng phần chữ: bài 2.000 từ là ~5.800 token chữ
+ * cộng ~6.500 token nghĩ, ở tốc độ 40–60 token/giây thành 205–307 giây — vắt
+ * ngang qua mép tường. Hạ xuống "medium" cắt gần nửa phần nghĩ, còn khoảng
+ * 150–220 giây, tức có biên thật.
+ *
+ * Đứt ở đây không phải là hỏng nhẹ: lượt gọi đã trả tiền, mà người viết nhận
+ * về một bài cụt giữa câu.
+ *
+ * Ngưỡng 1.200 vì đó là mốc "Bài dài" — dưới đó bài dài nhất cũng chỉ ~9.500
+ * token, vẫn còn biên rộng ở effort "high".
+ */
+const EFFORT_WORD_CAP = 1200;
+
+function effortFor(words: number): Effort {
+  return words > EFFORT_WORD_CAP ? "medium" : "high";
+}
 
 const FindingSchema = z.object({
   claim: z.string(),
@@ -87,6 +114,11 @@ export async function POST(request: Request) {
   const voice = voiceById(body.voiceId) ?? voiceById(DEFAULT_VOICE_ID)!;
 
   const prompt = promptFor(body, voice);
+  // Lượt chỉnh lại viết lại CẢ bài, nên nó cũng dài đúng bằng bài đang có —
+  // đo từ bản nháp chứ không mặc định "chỉnh thì nhanh".
+  const effort = effortFor(
+    body.mode === "refine" ? countWords(body.draft) : body.targetWords,
+  );
 
   let writer;
   try {
@@ -104,7 +136,7 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const chunk of writer.streamText({ role: "writer", prompt })) {
+        for await (const chunk of writer.streamText({ role: "writer", prompt, effort })) {
           controller.enqueue(encoder.encode(chunk));
         }
       } catch (error) {

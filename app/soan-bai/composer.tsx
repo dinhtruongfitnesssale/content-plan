@@ -282,7 +282,8 @@ export function Composer() {
             )}
             {!busy && targetWords >= 1200 && (
               <p className="text-xs leading-relaxed text-slate">
-                Bài dài mất 3–5 phút để viết xong. Đừng rời trang giữa chừng.
+                Bài dài mất 1–3 phút để viết xong, và máy chủ cắt ở phút thứ 5. Đừng rời
+                trang giữa chừng.
               </p>
             )}
           </div>

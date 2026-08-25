@@ -60,7 +60,7 @@ export const anthropicProvider: LlmProvider = {
     return response.parsed_output ?? null;
   },
 
-  async *streamText({ role, prompt, signal }) {
+  async *streamText({ role, prompt, signal, effort }) {
     const stream = anthropic().beta.messages.stream(
       {
         model: MODELS[role],
@@ -77,7 +77,9 @@ export const anthropicProvider: LlmProvider = {
         // thực sự sinh ra mới bị tính — nên để dư là đúng, chặt mới là dại.
         max_tokens: 32000,
         thinking: { type: "adaptive" },
-        output_config: { effort: role === "writer" ? "high" : "medium" },
+        // Route quyết định độ sâu khi nó biết mình có bao nhiêu giây; không
+        // nói gì thì rơi về mặc định theo vai.
+        output_config: { effort: effort ?? (role === "writer" ? "high" : "medium") },
         messages: [{ role: "user", content: prompt }],
         ...FALLBACK,
       },

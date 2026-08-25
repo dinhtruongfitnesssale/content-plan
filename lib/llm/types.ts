@@ -13,6 +13,16 @@ import type { z } from "zod";
  */
 export type LlmRole = "reader" | "writer";
 
+/**
+ * Độ sâu suy nghĩ của một lượt gọi.
+ *
+ * Không phải núm chỉnh chất lượng thuần tuý — nó là núm chỉnh THỜI GIAN. Ở
+ * effort "high", phần token suy nghĩ nhiều ngang phần chữ viết ra, mà route
+ * handler thì có trần cứng theo đồng hồ của nhà chạy máy chủ. Chỗ quyết định
+ * dùng mức nào là route, vì chỉ route mới biết trần của mình là bao nhiêu.
+ */
+export type Effort = "low" | "medium" | "high";
+
 export type StructuredRequest<T> = {
   role: LlmRole;
   prompt: string;
@@ -25,6 +35,8 @@ export type StreamRequest = {
   role: LlmRole;
   prompt: string;
   signal?: AbortSignal;
+  /** Bỏ trống thì nhà cung cấp tự chọn theo vai. */
+  effort?: Effort;
 };
 
 export type LlmProvider = {
