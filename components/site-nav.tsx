@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "Hôm nay" },
   { href: "/moi-nhat", label: "Mới nhất" },
   { href: "/nghien-cuu", label: "Nghiên cứu" },
+  { href: "/tong-hop", label: "Tổng hợp" },
   { href: "/soan-bai", label: "Soạn bài" },
   { href: "/thu-vien", label: "Thư viện" },
 ] as const;

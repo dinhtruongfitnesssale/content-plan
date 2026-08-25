@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { llm } from "@/lib/llm";
-import { composePrompt, refinePrompt, type CtaKind } from "@/lib/compose";
+import { composePrompt, refinePrompt, roundupPrompt, type CtaKind } from "@/lib/compose";
 import { MAX_WORDS, MIN_WORDS } from "@/lib/words";
-import { voiceById, DEFAULT_VOICE_ID } from "@/lib/voices";
+import { voiceById, DEFAULT_VOICE_ID, type Voice } from "@/lib/voices";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -36,12 +36,50 @@ const RequestSchema = z.discriminatedUnion("mode", [
     cta: z.enum(["khong", "cau-hoi", "viec-nho", "luu-bai"]),
   }),
   z.object({
+    mode: z.literal("tong-hop"),
+    topic: z.string().min(2).max(300),
+    // Trần cao hơn mode "compose": bài tổng hợp gộp cả tập phát hiện của một
+    // lượt tra cứu, không phải vài cái chọn tay.
+    findings: z.array(FindingSchema).min(2).max(20),
+    /** Số nghiên cứu đã đọc — client đếm từ tập bài thật, model được nêu lại. */
+    paperCount: z.number().int().min(1).max(50),
+    voiceId: z.string(),
+    targetWords: z.number().int().min(MIN_WORDS).max(MAX_WORDS),
+    cta: z.enum(["khong", "cau-hoi", "viec-nho", "luu-bai"]),
+  }),
+  z.object({
     mode: z.literal("refine"),
     draft: z.string().min(10).max(20000),
     instruction: z.string().min(3).max(1000),
     voiceId: z.string(),
   }),
 ]);
+
+type ComposeRequest = z.infer<typeof RequestSchema>;
+
+function promptFor(body: ComposeRequest, voice: Voice): string {
+  switch (body.mode) {
+    case "compose":
+      return composePrompt({
+        topic: body.topic,
+        findings: body.findings,
+        voice,
+        targetWords: body.targetWords,
+        cta: body.cta as CtaKind,
+      });
+    case "tong-hop":
+      return roundupPrompt({
+        topic: body.topic,
+        findings: body.findings,
+        voice,
+        targetWords: body.targetWords,
+        cta: body.cta as CtaKind,
+        paperCount: body.paperCount,
+      });
+    case "refine":
+      return refinePrompt(body.draft, body.instruction, voice);
+  }
+}
 
 export async function POST(request: Request) {
   const parsed = RequestSchema.safeParse(await request.json().catch(() => null));
@@ -52,16 +90,7 @@ export async function POST(request: Request) {
   const body = parsed.data;
   const voice = voiceById(body.voiceId) ?? voiceById(DEFAULT_VOICE_ID)!;
 
-  const prompt =
-    body.mode === "compose"
-      ? composePrompt({
-          topic: body.topic,
-          findings: body.findings,
-          voice,
-          targetWords: body.targetWords,
-          cta: body.cta as CtaKind,
-        })
-      : refinePrompt(body.draft, body.instruction, voice);
+  const prompt = promptFor(body, voice);
 
   let writer;
   try {

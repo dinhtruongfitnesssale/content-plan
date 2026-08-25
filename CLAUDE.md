@@ -118,6 +118,35 @@ vài tuần. Đây là giới hạn thật của dữ liệu, giao diện nói t
 Bật bộ lọc bậc là chỉ còn bài đã được gán nhãn — đo thật ngày 24/08/2026: cửa sổ
 90 ngày, bảy mảng, không lọc ra 84 bài (60 "Other"), lọc RCT ra 33 bài (0 "Other").
 
+### Bài tổng hợp — `/tong-hop`
+
+Một chủ đề vào, một bài gộp nhiều nghiên cứu ra, kèm danh mục trích dẫn ở cuối.
+Trang Nghiên cứu bắt chọn tay từng phát hiện để viết bài một ý; trang này trả lời
+câu hỏi khác — "cả tập bằng chứng về chuyện này nói gì" — nên dùng hết phát hiện
+kiểm chứng được. Vẫn đi qua `/api/research`, tức là vẫn qua `verifyFindings()`;
+rào chắn không có đường vòng nào.
+
+`roundupPrompt()` tách hẳn khỏi `composePrompt()` vì nó ép bố cục bốn chặng, trong
+đó chặng "điều còn vênh nhau" là bắt buộc — bài gộp mà chỗ nào cũng chắc nịch là
+bài không trung thực. Đây cũng là prompt duy nhất cho phép model nêu một con số
+ngoài phần dẫn chứng: **số nghiên cứu đã dẫn**, vì con số đó do code đếm.
+Nó phải khớp với con số ở đầu danh mục trích dẫn — cả hai đọc từ `splitCited()`.
+
+Danh mục trích dẫn (`buildCitations()`) tách hai nhóm và nói rõ nhóm nào KHÔNG
+được dẫn trong bài. Gộp chung một danh mục thì độc giả tưởng câu chữ nào cũng có
+nghiên cứu đứng sau. Hai cửa chắn nữa, cả hai đều vì danh mục này nằm trong bài
+đăng chứ không phải trong giao diện nội bộ:
+
+- `pickRelated()` loại bài lạc đề khỏi mục "đọc thêm". `searchPapers` **không cắt
+  tổng số sau khi gộp** — mỗi nguồn trả `limit` bài nên tập gộp gấp đôi, và đuôi
+  của OpenAlex khớp rất lỏng. Đo thật 25/08/2026 với "creatine women muscle": trong
+  12 bài không được dẫn có "Statin Safety", "Congenital Titinopathy". Cửa chắn đếm
+  từ khoá trên **tiêu đề**, không trên abstract — abstract dài, bài nào cũng có chữ
+  "muscle" ở đâu đó, đếm ở đó thì cửa chắn thành hình thức.
+- `splitCited()` khử trùng lặp theo tiêu đề **một lần nữa**. Tầng nghiên cứu khoá
+  theo DOI → PMID → tiêu đề, nên cùng một bài mà bản này có DOI bản kia không thì
+  cả hai cùng sống sót. Trùng thì giữ bản ĐƯỢC DẪN, không giữ bản đứng trước.
+
 ### Tầng LLM — `lib/llm/`
 
 Mọi lượt gọi model đi qua `llm(role)`. Route handler **không bao giờ** import SDK
@@ -137,6 +166,13 @@ Gemini dùng dữ liệu để huấn luyện, mà abstract công khai thì khô
 
 Anthropic: `thinking: { type: "adaptive" }` (không dùng `budget_tokens` — đã bị gỡ),
 độ sâu chỉnh bằng `output_config.effort`, streaming cho mọi lượt sinh dài.
+
+`max_tokens` tính CẢ token suy nghĩ, và ở effort "high" phần suy nghĩ mới là phần
+tốn: đo thật 25/08/2026 với một bài tổng hợp 300 từ — 4.748 token nghĩ, 5.622 token
+tổng. Trần 8.000 cũ đủ cho bài ngắn nhưng hết chỗ ở bài dài, mà khi hết chỗ thì model
+dừng TRƯỚC KHI viết được chữ nào: route trả HTTP 200 với thân rỗng, giao diện đứng
+im. Nay trần là 24.000, và `stop_reason: "max_tokens"` được nói thẳng ra thành một
+dòng trong luồng — im lặng ở đây là kiểu hỏng đắt nhất, vì lượt gọi đã trả tiền rồi.
 
 **`lib/llm/gemini.ts` chưa từng chạy thật** — viết theo tài liệu Interactions API,
 không có key để kiểm chứng. Hình dạng `step.delta` khi streaming là chỗ đáng ngờ
@@ -204,6 +240,7 @@ Prompt cấm model viết tên tạp chí hay năm nghiên cứu vào thân bài
 ```bash
 npx tsx scripts/thu-nghien-cuu.ts "creatine women"   # chạy thật tầng nghiên cứu, không mock
 npx tsx scripts/thu-moi-nhat.ts thuc-pham-bo-sung 30 # bảng tin: ngày, thứ tự, cửa sổ
+npx tsx scripts/thu-tong-hop.ts "creatine women" 12  # danh mục trích dẫn: số thứ tự, trùng lặp, bài lạc đề
 npx tsx scripts/thu-dem-tu.ts                        # kiểm bộ đếm từ tiếng Việt
 npm run build                                         # bắt lỗi Suspense / server-client boundary
 ```

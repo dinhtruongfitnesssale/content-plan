@@ -64,7 +64,13 @@ export const anthropicProvider: LlmProvider = {
     const stream = anthropic().beta.messages.stream(
       {
         model: MODELS[role],
-        max_tokens: 8000,
+        // `max_tokens` tính CẢ token suy nghĩ, không chỉ chữ viết ra — và ở
+        // effort "high" phần suy nghĩ mới là phần tốn. Đo thật ngày
+        // 25/08/2026 với một bài tổng hợp 300 từ: 4.748 token nghĩ, 5.622
+        // token tổng. Trần 8.000 cũ đủ cho bài ngắn nhưng hết chỗ ở bài dài,
+        // và khi hết chỗ thì model dừng TRƯỚC KHI viết được chữ nào: route
+        // trả HTTP 200 với thân rỗng, giao diện đứng im không báo gì.
+        max_tokens: 24000,
         thinking: { type: "adaptive" },
         output_config: { effort: role === "writer" ? "high" : "medium" },
         messages: [{ role: "user", content: prompt }],
@@ -82,6 +88,11 @@ export const anthropicProvider: LlmProvider = {
     const final = await stream.finalMessage();
     if (final.stop_reason === "refusal") {
       yield "\n\n[Lượt viết này bị từ chối. Thử diễn đạt lại chủ đề hoặc bỏ bớt một dẫn chứng.]";
+    }
+    // Đụng trần thì nói ra. Im lặng ở đây nghĩa là người dùng nhìn một bài cụt
+    // giữa câu — hoặc một khung trắng — mà tưởng model viết được có thế.
+    if (final.stop_reason === "max_tokens") {
+      yield "\n\n[Bài bị cắt vì chạm trần token. Giảm độ dài mục tiêu hoặc bớt dẫn chứng rồi viết lại.]";
     }
   },
 };

@@ -77,8 +77,36 @@ type OpenAlexWork = {
   open_access?: { is_oa?: boolean; oa_url?: string | null } | null;
 };
 
+/**
+ * OpenAlex trả tiêu đề và tên tạp chí còn nguyên thực thể HTML — thấy thật với
+ * "Medicine &amp; Science in Sports &amp; Exercise". Trang web hiện ra thì
+ * trình duyệt tự giải mã, nhưng chuỗi này còn đi vào danh mục trích dẫn cuối
+ * bài đăng Facebook, nơi không có gì giải mã hộ — độc giả đọc đúng chữ
+ * "&amp;" trong tên tạp chí.
+ *
+ * Chỉ giải mã đúng bộ thực thể thật sự gặp trong dữ liệu thư mục. Không viết
+ * bộ giải mã HTML đầy đủ: đây là tên tạp chí, không phải trang HTML.
+ */
+const ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&apos;": "'",
+  "&#39;": "'",
+  "&nbsp;": " ",
+};
+
+function decodeEntities(text: string): string;
+function decodeEntities(text: null | undefined): null;
+function decodeEntities(text: string | null | undefined): string | null;
+function decodeEntities(text: string | null | undefined): string | null {
+  if (!text) return null;
+  return text.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/g, (found) => ENTITIES[found] ?? found);
+}
+
 function toPaper(work: OpenAlexWork): Paper | null {
-  const title = work.title?.trim();
+  const title = decodeEntities(work.title)?.trim();
   const openAlexId = work.id?.split("/").pop();
   if (!title || !openAlexId) return null;
 
@@ -95,7 +123,7 @@ function toPaper(work: OpenAlexWork): Paper | null {
       .filter((name): name is string => Boolean(name)),
     year: work.publication_year ?? null,
     publishedOn: readDate(work.publication_date),
-    journal: work.primary_location?.source?.display_name ?? null,
+    journal: decodeEntities(work.primary_location?.source?.display_name)?.trim() ?? null,
     doi,
     pmid,
     url: work.open_access?.oa_url ?? (doi ? `https://doi.org/${doi}` : work.id!),
