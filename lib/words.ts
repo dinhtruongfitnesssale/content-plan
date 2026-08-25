@@ -20,10 +20,28 @@ export function countWords(text: string): number {
 /** Biên độ chấp nhận được quanh số từ mục tiêu. */
 export const TOLERANCE = 0.1;
 
+/**
+ * Bài dài được nới biên.
+ *
+ * Lệch biên nghĩa là gọi model thêm MỘT lượt nữa để viết lại CẢ bài — ở bài
+ * 300 từ lượt đó rẻ, ở bài 2.000 từ nó tốn đúng bằng lượt viết đầu tiên. Mà
+ * càng viết dài model càng bám số từ kém, nên giữ ±10% ở đây là tự chuốc lấy
+ * một lượt viết lại gần như mỗi lần, chỉ để dịch bài từ 1.750 về 1.800 từ.
+ * Bài ngắn giữ nguyên ±10%: mốc "Ngắn" 80 từ hứa hiện trọn không cần bấm
+ * "Xem thêm", nới biên ở đó là phá lời hứa đó.
+ */
+export const LONG_FORM_WORDS = 600;
+export const LONG_FORM_TOLERANCE = 0.15;
+
+export function toleranceFor(target: number): number {
+  return target > LONG_FORM_WORDS ? LONG_FORM_TOLERANCE : TOLERANCE;
+}
+
 export function wordRange(target: number): { min: number; max: number } {
+  const tolerance = toleranceFor(target);
   return {
-    min: Math.round(target * (1 - TOLERANCE)),
-    max: Math.round(target * (1 + TOLERANCE)),
+    min: Math.round(target * (1 - tolerance)),
+    max: Math.round(target * (1 + tolerance)),
   };
 }
 
@@ -42,7 +60,8 @@ export const LENGTH_PRESETS = [
   { words: 150, label: "Chuẩn", note: "Độ dài quen thuộc của bài feed." },
   { words: 300, label: "Kể chuyện", note: "Đủ chỗ cho một câu chuyện có mở và kết." },
   { words: 600, label: "Chuyên sâu", note: "Bài dài, nhiều dẫn chứng. Đăng thưa thôi." },
+  { words: 1200, label: "Bài dài", note: "Gần một bài blog. Viết mất vài phút, đọc hết cũng vậy." },
 ] as const;
 
 export const MIN_WORDS = 60;
-export const MAX_WORDS = 800;
+export const MAX_WORDS = 2000;

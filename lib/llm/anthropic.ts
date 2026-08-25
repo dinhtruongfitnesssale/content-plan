@@ -70,7 +70,12 @@ export const anthropicProvider: LlmProvider = {
         // token tổng. Trần 8.000 cũ đủ cho bài ngắn nhưng hết chỗ ở bài dài,
         // và khi hết chỗ thì model dừng TRƯỚC KHI viết được chữ nào: route
         // trả HTTP 200 với thân rỗng, giao diện đứng im không báo gì.
-        max_tokens: 24000,
+        //
+        // Nâng lên 32.000 khi trần độ dài lên 2.000 từ (26/08/2026): một âm
+        // tiết tiếng Việt tốn ~2,9 token, nên bài 2.000 từ là ~5.800 token chữ
+        // cộng ~6.500 token nghĩ. Nâng trần KHÔNG tốn thêm tiền — chỉ token
+        // thực sự sinh ra mới bị tính — nên để dư là đúng, chặt mới là dại.
+        max_tokens: 32000,
         thinking: { type: "adaptive" },
         output_config: { effort: role === "writer" ? "high" : "medium" },
         messages: [{ role: "user", content: prompt }],

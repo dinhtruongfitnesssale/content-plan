@@ -171,8 +171,16 @@ Anthropic: `thinking: { type: "adaptive" }` (không dùng `budget_tokens` — đ
 tốn: đo thật 25/08/2026 với một bài tổng hợp 300 từ — 4.748 token nghĩ, 5.622 token
 tổng. Trần 8.000 cũ đủ cho bài ngắn nhưng hết chỗ ở bài dài, mà khi hết chỗ thì model
 dừng TRƯỚC KHI viết được chữ nào: route trả HTTP 200 với thân rỗng, giao diện đứng
-im. Nay trần là 24.000, và `stop_reason: "max_tokens"` được nói thẳng ra thành một
+im. Nay trần là 32.000, và `stop_reason: "max_tokens"` được nói thẳng ra thành một
 dòng trong luồng — im lặng ở đây là kiểu hỏng đắt nhất, vì lượt gọi đã trả tiền rồi.
+
+Con số 32.000 đến từ trần độ dài 2.000 từ: một âm tiết tiếng Việt tốn ~2,9 token,
+nên bài 2.000 từ là ~5.800 token chữ cộng ~6.500 token nghĩ. Nâng trần **không tốn
+thêm tiền** — chỉ token thực sự sinh ra mới bị tính — nên để dư là đúng.
+
+`maxDuration` của `/api/compose` là **600 giây**, không phải 300. Đây là trần cứng
+theo đồng hồ mà streaming không cứu được: bài 2.000 từ mất 200–320 giây, và lượt
+chỉnh lại độ dài là một lượt gọi RIÊNG viết lại cả bài, tốn ngang lượt đầu.
 
 **`lib/llm/gemini.ts` chưa từng chạy thật** — viết theo tài liệu Interactions API,
 không có key để kiểm chứng. Hình dạng `step.delta` khi streaming là chỗ đáng ngờ
@@ -194,8 +202,19 @@ không phải chỉ tên tác giả — để tên không thôi thì model cho r
 ### Độ dài bài
 
 Ràng buộc hai lớp: prompt nêu số từ mục tiêu, rồi `countWords()` đếm lại sau khi sinh.
-Lệch quá ±10% thì chỉnh đúng MỘT lượt refine, không lặp vô hạn.
+Lệch quá biên thì chỉnh đúng MỘT lượt refine, không lặp vô hạn.
 Tiếng Việt đếm theo âm tiết tách bằng khoảng trắng — giao diện ghi rõ để không hiểu nhầm.
+
+Biên **không cố định ±10%**: từ 601 từ trở lên nới thành ±15% (`toleranceFor()`).
+Lý do là giá của một lần lệch biên: nó gọi model thêm một lượt để viết lại CẢ bài,
+ở bài 300 từ thì rẻ, ở bài 2.000 từ thì tốn đúng bằng lượt viết đầu. Mà càng dài
+model càng bám số từ kém, nên giữ ±10% ở đó là tự chuốc một lượt viết lại gần như
+mỗi lần. Bài ngắn giữ nguyên ±10% có chủ ý: mốc "Ngắn" 80 từ hứa hiện trọn không
+cần bấm "Xem thêm", nới biên ở đó là phá lời hứa đó.
+
+`MAX_WORDS` là 2.000. Nâng tiếp thì phải sửa cả `max_tokens`, `maxDuration`, và
+trần ký tự của `draft` ở mode refine (`route.ts`) — bốn con số này đi cùng nhau,
+đổi một cái mà quên ba cái kia thì bài bị cắt giữa câu hoặc nút "Chỉnh lại" báo 400.
 
 ### Lưu trữ
 

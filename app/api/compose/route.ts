@@ -6,7 +6,11 @@ import { MAX_WORDS, MIN_WORDS } from "@/lib/words";
 import { voiceById, DEFAULT_VOICE_ID, type Voice } from "@/lib/voices";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+// Trần cứng theo đồng hồ, streaming không cứu được. Bài 2.000 từ là ~12.000
+// token, với tốc độ Opus 40–60 token/giây là 200–320 giây — sát mép 300 giây
+// cũ, tức thỉnh thoảng đứt SAU KHI đã trả tiền cho lượt gọi. 600 giây cho đủ
+// biên, kể cả lượt chỉnh lại độ dài (lượt đó viết lại cả bài, tốn ngang lượt đầu).
+export const maxDuration = 600;
 
 const FindingSchema = z.object({
   claim: z.string(),
