@@ -13,7 +13,14 @@ export type ResearchResponse = {
   droppedCount: number;
 };
 
-/** Gói dữ liệu chuyển từ trang Nghiên cứu sang trang Soạn bài. */
+/**
+ * Gói dữ liệu chuyển từ trang Nghiên cứu sang trang Soạn bài.
+ *
+ * `papers` gồm CẢ hai loại: bài đứng sau các phát hiện đã tích, và bài người
+ * viết tích thêm cho mục "đọc thêm". Bên Soạn bài chia lại bằng `splitCited()`
+ * theo `paperIds` của phát hiện chứ không đoán — dán nhãn "đã dẫn" cho một bài
+ * không hề được dẫn cũng là một kiểu dẫn nguồn sai.
+ */
 export type ComposerHandoff = {
   topic: string;
   findings: Finding[];

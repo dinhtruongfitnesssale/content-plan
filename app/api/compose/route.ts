@@ -21,20 +21,14 @@ const FindingSchema = z.object({
   paperIds: z.array(z.string()),
 });
 
-const PaperSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  year: z.number().nullable(),
-  journal: z.string().nullable(),
-  url: z.string(),
-});
-
 const RequestSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("compose"),
     topic: z.string().min(2).max(300),
-    findings: z.array(FindingSchema).min(1).max(12),
-    papers: z.array(PaperSchema).max(30),
+    // Cùng trần 20 với mode "tong-hop". Hai mode nay nhận dẫn chứng từ cùng
+    // một lượt tích chọn ở trang Nghiên cứu, nên hai trần khác nhau chỉ tạo ra
+    // một lỗi 400 đúng vào lúc người viết đổi dạng bài.
+    findings: z.array(FindingSchema).min(1).max(20),
     voiceId: z.string(),
     targetWords: z.number().int().min(MIN_WORDS).max(MAX_WORDS),
     cta: z.enum(["khong", "cau-hoi", "viec-nho", "luu-bai"]),
@@ -42,8 +36,6 @@ const RequestSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("tong-hop"),
     topic: z.string().min(2).max(300),
-    // Trần cao hơn mode "compose": bài tổng hợp gộp cả tập phát hiện của một
-    // lượt tra cứu, không phải vài cái chọn tay.
     findings: z.array(FindingSchema).min(2).max(20),
     /** Số nghiên cứu đã đọc — client đếm từ tập bài thật, model được nêu lại. */
     paperCount: z.number().int().min(1).max(50),

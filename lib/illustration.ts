@@ -56,8 +56,8 @@ export type IllustrationIdea = z.infer<typeof IllustrationIdeaSchema>;
 
 /**
  * Loại trừ nền, ghép bằng CODE chứ không do model sinh — cùng lý do với
- * `buildSources()`: những thứ tuyệt đối không được có trong ảnh thì không thể
- * phụ thuộc vào việc model có nhớ viết ra hay không.
+ * `buildCitations()`: những thứ tuyệt đối không được có trong ảnh thì không
+ * thể phụ thuộc vào việc model có nhớ viết ra hay không.
  *
  * Ba nhóm, ba lý do khác nhau:
  * - chữ và đồ thị: model sinh ảnh viết tiếng Việt có dấu ra chữ méo, và một

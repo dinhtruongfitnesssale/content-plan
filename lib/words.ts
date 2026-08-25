@@ -61,6 +61,11 @@ export const LENGTH_PRESETS = [
   { words: 300, label: "Kể chuyện", note: "Đủ chỗ cho một câu chuyện có mở và kết." },
   { words: 600, label: "Chuyên sâu", note: "Bài dài, nhiều dẫn chứng. Đăng thưa thôi." },
   { words: 1200, label: "Bài dài", note: "Gần một bài blog. Viết mất vài phút, đọc hết cũng vậy." },
+  {
+    words: 2000,
+    label: "Tối đa",
+    note: "Trần của app. Rất dài với Facebook — chỉ hợp bài gộp nhiều nghiên cứu, viết mất 3–5 phút.",
+  },
 ] as const;
 
 export const MIN_WORDS = 60;

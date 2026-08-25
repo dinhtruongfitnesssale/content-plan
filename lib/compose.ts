@@ -16,6 +16,27 @@ export type ComposeInput = {
 
 export type CtaKind = "khong" | "cau-hoi" | "viec-nho" | "luu-bai";
 
+/**
+ * Dạng bài — quyết định dùng `composePrompt` hay `roundupPrompt`.
+ *
+ * Id trùng với `mode` của `/api/compose` để không phải dịch qua lại giữa hai
+ * bảng tên; lệch tên ở đây là kiểu hỏng chỉ lộ ra khi bấm nút.
+ */
+export type PostKind = "compose" | "tong-hop";
+
+export const POST_KINDS: { id: PostKind; label: string; note: string }[] = [
+  {
+    id: "compose",
+    label: "Bài một ý",
+    note: "Viết quanh một điều duy nhất. Hợp khi chỉ chọn vài phát hiện cùng nói một chuyện.",
+  },
+  {
+    id: "tong-hop",
+    label: "Bài tổng hợp",
+    note: "Gộp cả tập bằng chứng: chỗ các nghiên cứu đồng thuận, chỗ còn vênh nhau, rồi ý nghĩa thực tế.",
+  },
+];
+
 export const CTA_CHOICES: { id: CtaKind; label: string; instruction: string }[] = [
   { id: "khong", label: "Không có", instruction: "Không thêm lời kêu gọi nào. Kết thúc tự nhiên." },
   {
@@ -75,11 +96,12 @@ ${ctaInstruction(input.cta)}
 
 1. Mọi con số trong bài phải trích từ phần dẫn chứng ở trên. Không thêm số liệu từ kiến thức nền của bạn.
 2. Nếu một dẫn chứng có phần "Cần nói rõ", phải phản ánh giới hạn đó trong bài — không được lờ đi để bài nghe chắc chắn hơn thực tế.
-3. Không viết tên tác giả, tên tạp chí, hay năm nghiên cứu trong thân bài. Phần nguồn được ghép tự động bên dưới.
-4. Viết thành đoạn ngắn 2–3 câu, cách nhau bằng dòng trống — bài dài liền mạch rất khó đọc trên điện thoại.
-5. Không dùng markdown, không tiêu đề, không gạch đầu dòng, không in đậm. Facebook không hiển thị được.
-6. Dùng emoji rất tiết chế hoặc không dùng.
-7. Không mở đầu bằng "Bạn có biết", "Có bao giờ bạn", hay bất kỳ câu hỏi tu từ sáo mòn nào.
+3. Không viết tên tác giả, tên tạp chí, hay năm nghiên cứu trong thân bài. Danh mục trích dẫn có đánh số được ghép tự động bên dưới, đầy đủ và có link.
+4. Không tự đánh số dẫn chứng kiểu [1], [2] trong thân bài. Số thứ tự trong danh mục do code đánh theo dữ liệu thật; model đoán số là dẫn nguồn sai.
+5. Viết thành đoạn ngắn 2–3 câu, cách nhau bằng dòng trống — bài dài liền mạch rất khó đọc trên điện thoại.
+6. Không dùng markdown, không tiêu đề, không gạch đầu dòng, không in đậm. Facebook không hiển thị được.
+7. Dùng emoji rất tiết chế hoặc không dùng.
+8. Không mở đầu bằng "Bạn có biết", "Có bao giờ bạn", hay bất kỳ câu hỏi tu từ sáo mòn nào.
 
 Tuyệt đối không:
 ${NEVER.map((rule) => `- ${rule}`).join("\n")}
@@ -117,21 +139,6 @@ ${instruction}
 ${draft}`;
 }
 
-/**
- * Phần nguồn được ghép bằng code từ dữ liệu Paper thật, KHÔNG do model sinh.
- * Đây là lý do bài đăng không bao giờ dẫn tới một nghiên cứu không tồn tại.
- */
-export function buildSources(papers: Paper[]): string {
-  if (papers.length === 0) return "";
-
-  const lines = papers.map((paper) => {
-    const year = paper.year ? ` (${paper.year})` : "";
-    const journal = paper.journal ? `, ${paper.journal}` : "";
-    return `• ${paper.title}${year}${journal}\n  ${paper.url}`;
-  });
-
-  return `\n\n—\nNguồn:\n${lines.join("\n")}`;
-}
 
 /** Đoạn đầu tiên là hook — tách bằng code để nút "đổi hook" sửa được riêng phần đó. */
 export function splitHook(draft: string): { hook: string; rest: string } {
@@ -218,7 +225,7 @@ ${ctaInstruction(input.cta)}
 3. Nói rõ bằng chứng mạnh tới đâu bằng lời đời thường — "nhiều thử nghiệm cỡ lớn cùng cho kết quả này" hay "mới có vài nghiên cứu nhỏ". Không dùng "meta-analysis", "RCT", "có ý nghĩa thống kê".
 4. Nếu một dẫn chứng có phần "Cần nói rõ", phải phản ánh giới hạn đó — không được lờ đi để bài nghe chắc chắn hơn thực tế.
 5. Không viết tên tác giả, tên tạp chí, hay năm nghiên cứu trong thân bài. Danh mục trích dẫn được ghép tự động bên dưới, đầy đủ và có link.
-6. Không đánh số dẫn chứng kiểu [1], [2] trong bài. Độc giả Facebook không tra ngược được, mà số sai thì thành dẫn nguồn sai.
+6. Không tự đánh số dẫn chứng kiểu [1], [2] trong bài. Danh mục bên dưới có đánh số, nhưng số đó do code đánh theo dữ liệu thật — model tự gán số là gán sai, và số sai thì thành dẫn nguồn sai.
 7. Viết thành đoạn ngắn 2–3 câu, cách nhau bằng dòng trống — bài dài liền mạch rất khó đọc trên điện thoại.
 8. Không dùng markdown, không tiêu đề, không gạch đầu dòng, không in đậm. Facebook không hiển thị được.
 9. Dùng emoji rất tiết chế hoặc không dùng.
@@ -341,39 +348,55 @@ function normalizeWords(text: string): string {
 }
 
 /**
- * Danh mục trích dẫn cuối bài tổng hợp — đánh số liên tục qua cả hai nhóm.
+ * Danh mục trích dẫn cuối bài — đánh số liên tục qua cả hai nhóm.
  *
- * Cũng như `buildSources()`, phần này ghép bằng code từ dữ liệu `Paper` thật,
- * KHÔNG do model sinh. Đánh số để độc giả đếm được "bài này dựa trên bao nhiêu
- * nghiên cứu" — con số đó phải khớp với con số model nêu trong thân bài, và cả
- * hai đều đếm từ cùng một mảng.
+ * Đây là khuôn trích dẫn DUY NHẤT của app: bài dựng từ một nghiên cứu cũng đi
+ * qua đây và ra đúng một mục mang số 1. Trước đây bài một ý dùng một hàm riêng
+ * ghép danh sách gạch đầu dòng không đánh số — hai khuôn cho cùng một việc chỉ
+ * làm độc giả gặp hai kiểu dẫn nguồn tuỳ bài, mà kiểu không số thì không đếm
+ * được và không tra ngược được.
+ *
+ * Phần này ghép bằng code từ dữ liệu `Paper` thật, KHÔNG do model sinh. Đánh
+ * số để độc giả đếm được "bài này dựa trên bao nhiêu nghiên cứu" — con số đó
+ * phải khớp với con số model nêu trong thân bài, và cả hai đều đếm từ cùng một
+ * mảng.
  *
  * Nhóm "đọc thêm" nói thẳng là KHÔNG được dẫn trong bài. Gộp chung một danh
  * mục thì độc giả tưởng mọi bài trong đó đều đứng sau câu chữ phía trên.
  */
-export function buildCitations(
-  cited: Paper[],
-  related: Paper[] = [],
-): string {
+export function buildCitations(cited: Paper[], related: Paper[] = []): string {
   if (cited.length === 0 && related.length === 0) return "";
 
   const blocks: string[] = [];
   let index = 0;
 
   if (cited.length > 0) {
-    const lines = cited.map((paper) => citation(paper, ++index));
-    blocks.push(`Nguồn dẫn trong bài (${cited.length} nghiên cứu):\n\n${lines.join("\n\n")}`);
+    const entries = cited.map((paper) => citation(paper, ++index));
+    // Tiêu đề nhóm chỉ có nghĩa khi CÓ nhóm thứ hai để phân biệt. Không có
+    // bài đọc thêm mà vẫn in nó thì thành hai dòng tiêu đề chồng nhau ngay
+    // đầu danh mục, chẳng nói thêm điều gì.
+    const heading =
+      related.length > 0 ? `Dẫn trong bài (${cited.length} nghiên cứu):\n\n` : "";
+    blocks.push(`${heading}${entries.join("\n\n")}`);
   }
 
   if (related.length > 0) {
-    const lines = related.map((paper) => citation(paper, ++index));
+    const entries = related.map((paper) => citation(paper, ++index));
     blocks.push(
-      `Cùng chủ đề, không dẫn trực tiếp trong bài nhưng đáng đọc:\n\n${lines.join("\n\n")}`,
+      `Cùng chủ đề, không dẫn trực tiếp trong bài nhưng đáng đọc:\n\n${entries.join("\n\n")}`,
     );
   }
 
-  return `\n\n—\n${blocks.join("\n\n")}`;
+  return `\n\n—\n${CITATION_HEADING}\n\n${blocks.join("\n\n")}`;
 }
+
+/**
+ * Mốc mở đầu danh mục.
+ *
+ * Giữ cả chữ tiếng Anh vì đó là mốc độc giả quen mắt ở bài khoa học — nhìn
+ * thấy nó là biết bên dưới có nguồn tra được, kể cả khi đang lướt nhanh.
+ */
+const CITATION_HEADING = "Nguồn tham khảo (References)";
 
 /** Một mục trích dẫn: số thứ tự, tiêu đề gốc, rồi dòng metadata, rồi link. */
 function citation(paper: Paper, index: number): string {

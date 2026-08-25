@@ -20,7 +20,7 @@ import type { ResearchResponse } from "@/lib/types";
  * bản lưu cũ mang id không còn tồn tại. Đổi khoá là bỏ hẳn bản cũ, chắc chắn
  * hơn cố đọc rồi vá.
  */
-const KEY = "ban-viet:tra-cuu-gan-nhat:v2";
+const KEY = "ban-viet:tra-cuu-gan-nhat:v3";
 
 export const CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -31,6 +31,13 @@ export type ResearchCache = {
   result: ResearchResponse;
   /** Chỉ số các phát hiện đang được chọn — chọn xong tải lại trang vẫn còn. */
   chosen: number[];
+  /**
+   * Id các bài được tích thêm ngoài phần bài đứng sau phát hiện đã chọn.
+   *
+   * Lưu theo id chứ không theo chỉ số như `chosen`: mảng phát hiện chỉ tồn tại
+   * trong đúng lượt tra cứu đó, còn id bài là khoá thật của tầng nghiên cứu.
+   */
+  chosenPapers: string[];
   /** Mốc của lượt TRA CỨU, không phải lượt ghi. Chọn thêm không gia hạn. */
   savedAt: number;
 };
@@ -54,6 +61,7 @@ export function readResearchCache(): ResearchCache | null {
       ...cached,
       tiers: (cached.tiers ?? []).filter((tier) => valid.has(tier)),
       chosen: cached.chosen ?? [],
+      chosenPapers: cached.chosenPapers ?? [],
     };
   } catch {
     // Dữ liệu hỏng hoặc trình duyệt chặn localStorage — coi như chưa có.

@@ -118,13 +118,29 @@ vài tuần. Đây là giới hạn thật của dữ liệu, giao diện nói t
 Bật bộ lọc bậc là chỉ còn bài đã được gán nhãn — đo thật ngày 24/08/2026: cửa sổ
 90 ngày, bảy mảng, không lọc ra 84 bài (60 "Other"), lọc RCT ra 33 bài (0 "Other").
 
-### Bài tổng hợp — `/tong-hop`
+### Một đường đi duy nhất: `/nghien-cuu` → `/soan-bai`
 
-Một chủ đề vào, một bài gộp nhiều nghiên cứu ra, kèm danh mục trích dẫn ở cuối.
-Trang Nghiên cứu bắt chọn tay từng phát hiện để viết bài một ý; trang này trả lời
-câu hỏi khác — "cả tập bằng chứng về chuyện này nói gì" — nên dùng hết phát hiện
-kiểm chứng được. Vẫn đi qua `/api/research`, tức là vẫn qua `verifyFindings()`;
-rào chắn không có đường vòng nào.
+Trước đây có hai trang sinh bài: `/nghien-cuu` bắt chọn tay từng phát hiện cho bài
+một ý, còn `/tong-hop` tự dùng hết phát hiện cho bài gộp. Hai trang tra cùng một
+API với cùng một chủ đề, chỉ khác ở chỗ ai chọn dẫn chứng — nên đã gộp làm một.
+`/tong-hop` nay là redirect 308 khai trong `next.config.ts`; đừng dựng lại route đó.
+
+Bài một ý hay bài gộp không còn là chọn trang, mà là **công tắc `PostKind` ở trang
+Soạn bài** — mặc định theo số phát hiện được tích (≥ 2 thì gộp), đổi tay được. Hai
+dạng vẫn đi qua hai prompt tách hẳn nhau, xem `roundupPrompt()` bên dưới.
+
+Ô tích ở trang Nghiên cứu có ở **hai chỗ và hai chỗ đó không cùng nghĩa**:
+
+- Tích một **phát hiện** là đưa số liệu của nó vào thân bài; bài đứng sau nó tự vào
+  danh mục và ô tích của bài đó bị **khoá ở trạng thái đã đánh dấu**. Cho bỏ tích ở
+  đó là cho bài đăng dẫn số liệu của một nghiên cứu không có trong danh mục.
+- Tích một **nghiên cứu** chỉ đưa bài vào mục "đọc thêm" của danh mục. Model không
+  được dẫn số liệu từ nó — abstract chưa rút thành `Finding` thì chưa qua
+  `verifyFindings()`.
+
+Nút "Chọn bài cùng chủ đề" đi qua `pickRelated()` chứ không quét sạch danh sách;
+tích tay từng bài thì người dùng đọc tiêu đề rồi tự quyết, còn một nút quét sạch thì
+không ai đọc.
 
 `roundupPrompt()` tách hẳn khỏi `composePrompt()` vì nó ép bố cục bốn chặng, trong
 đó chặng "điều còn vênh nhau" là bắt buộc — bài gộp mà chỗ nào cũng chắc nịch là
@@ -132,10 +148,18 @@ bài không trung thực. Đây cũng là prompt duy nhất cho phép model nêu
 ngoài phần dẫn chứng: **số nghiên cứu đã dẫn**, vì con số đó do code đếm.
 Nó phải khớp với con số ở đầu danh mục trích dẫn — cả hai đọc từ `splitCited()`.
 
-Danh mục trích dẫn (`buildCitations()`) tách hai nhóm và nói rõ nhóm nào KHÔNG
-được dẫn trong bài. Gộp chung một danh mục thì độc giả tưởng câu chữ nào cũng có
-nghiên cứu đứng sau. Hai cửa chắn nữa, cả hai đều vì danh mục này nằm trong bài
-đăng chứ không phải trong giao diện nội bộ:
+### Danh mục trích dẫn
+
+`buildCitations()` là khuôn trích dẫn **duy nhất**: bài dựng từ một nghiên cứu cũng
+đi qua đây và ra đúng một mục mang số 1. Trước đây bài một ý dùng `buildSources()`
+riêng, ghép danh sách gạch đầu dòng không đánh số — hàm đó đã gỡ, đừng dựng lại.
+Mọi bài đăng mở danh mục bằng mốc `Nguồn tham khảo (References)`.
+
+Danh mục tách hai nhóm và nói rõ nhóm nào KHÔNG được dẫn trong bài. Gộp chung một
+danh mục thì độc giả tưởng câu chữ nào cũng có nghiên cứu đứng sau. Tiêu đề nhóm
+chỉ in ra khi CÓ nhóm thứ hai — không có bài đọc thêm mà vẫn in thì thành hai dòng
+tiêu đề chồng nhau ngay đầu danh mục. Hai cửa chắn nữa, cả hai đều vì danh mục này
+nằm trong bài đăng chứ không phải trong giao diện nội bộ:
 
 - `pickRelated()` loại bài lạc đề khỏi mục "đọc thêm". `searchPapers` **không cắt
   tổng số sau khi gộp** — mỗi nguồn trả `limit` bài nên tập gộp gấp đôi, và đuôi
@@ -250,16 +274,18 @@ cứu sai còn tệ hơn bài không dẫn gì. Prompt buộc trích nguyên vă
 `verifyFindings()` loại mọi phát hiện tham chiếu id không có trong tập đã gửi; giao diện
 báo rõ số phát hiện bị loại thay vì giấu.
 
-Phần **Nguồn** cuối bài đăng được ghép bằng code từ dữ liệu `Paper` thật (`buildSources()`),
-KHÔNG do model sinh — nên bài đăng không bao giờ dẫn tới một nghiên cứu không tồn tại.
-Prompt cấm model viết tên tạp chí hay năm nghiên cứu vào thân bài vì lý do đó.
+Phần **Nguồn tham khảo** cuối bài đăng được ghép bằng code từ dữ liệu `Paper` thật
+(`buildCitations()`), KHÔNG do model sinh — nên bài đăng không bao giờ dẫn tới một
+nghiên cứu không tồn tại. Prompt cấm model viết tên tạp chí hay năm nghiên cứu vào
+thân bài vì lý do đó, và cấm luôn model tự đánh số kiểu [1], [2]: số trong danh mục
+do code đánh theo dữ liệu thật, model tự gán số là gán sai.
 
 ## Kiểm thử
 
 ```bash
 npx tsx scripts/thu-nghien-cuu.ts "creatine women"   # chạy thật tầng nghiên cứu, không mock
 npx tsx scripts/thu-moi-nhat.ts thuc-pham-bo-sung 30 # bảng tin: ngày, thứ tự, cửa sổ
-npx tsx scripts/thu-tong-hop.ts "creatine women" 12  # danh mục trích dẫn: số thứ tự, trùng lặp, bài lạc đề
+npx tsx scripts/thu-trich-dan.ts "creatine women" 12 # danh mục trích dẫn: số thứ tự, trùng lặp, bài lạc đề
 npx tsx scripts/thu-dem-tu.ts                        # kiểm bộ đếm từ tiếng Việt
 npm run build                                         # bắt lỗi Suspense / server-client boundary
 ```

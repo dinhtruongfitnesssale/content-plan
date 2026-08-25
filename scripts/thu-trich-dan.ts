@@ -1,11 +1,11 @@
 /**
- * Kiểm phần GHÉP BẰNG CODE của bài tổng hợp, chạy thật tầng nghiên cứu:
- *   npx tsx scripts/thu-tong-hop.ts "creatine women" 16
+ * Kiểm phần GHÉP BẰNG CODE của danh mục trích dẫn, chạy thật tầng nghiên cứu:
+ *   npx tsx scripts/thu-trich-dan.ts "creatine women" 16
  *
- * Cố ý KHÔNG gọi model. Chỗ dễ hỏng ở tính năng này không nằm ở câu chữ model
- * viết ra mà nằm ở danh mục trích dẫn: đánh số có liên tục qua hai nhóm không,
- * bài nào bị xếp nhầm sang nhóm "đã dẫn", link có thật không. Muốn xem câu chữ
- * thì mở /tong-hop — ở đó `verifyFindings()` đã đứng sẵn trên đường đi.
+ * Cố ý KHÔNG gọi model. Chỗ dễ hỏng ở đây không nằm ở câu chữ model viết ra mà
+ * nằm ở danh mục: đánh số có liên tục qua hai nhóm không, bài nào bị xếp nhầm
+ * sang nhóm "đã dẫn", link có thật không. Muốn xem câu chữ thì mở /nghien-cuu
+ * rồi tích chọn — đường đó đi qua `verifyFindings()`.
  *
  * Vì không gọi model nên script tự dựng "phát hiện giả": mỗi phát hiện dẫn một
  * bài có abstract. Đủ để kiểm cách chia nhóm và cách đánh số.
@@ -79,10 +79,23 @@ async function main() {
       : `✗ Lặp: ${[...new Set(twice)].join(" | ")}`,
   );
 
+  // Mốc "References" phải có ở mọi bài — đó là thứ độc giả tìm khi lướt xuống.
+  console.log(
+    block.includes("Nguồn tham khảo (References)")
+      ? "✓ Có mốc Nguồn tham khảo (References)."
+      : "✗ Thiếu mốc Nguồn tham khảo.",
+  );
+
   // Con số model được phép nêu trong thân bài phải khớp con số ở đầu danh mục.
-  const header = block.match(/Nguồn dẫn trong bài \((\d+) nghiên cứu\)/);
-  const match = header !== null && Number(header[1]) === cited.length;
-  console.log(match ? "✓ Số nghiên cứu ở danh mục khớp số truyền cho prompt." : "✗ Lệch số nghiên cứu.");
+  // Không có nhóm "đọc thêm" thì danh mục bỏ luôn tiêu đề nhóm — khi đó số
+  // nghiên cứu đã dẫn chính là số mục, không phải là thiếu tiêu đề.
+  const header = block.match(/Dẫn trong bài \((\d+) nghiên cứu\):/);
+  const shown = header !== null ? Number(header[1]) : kept.length === 0 ? numbers.length : null;
+  console.log(
+    shown === cited.length
+      ? "✓ Số nghiên cứu ở danh mục khớp số truyền cho prompt."
+      : `✗ Lệch số nghiên cứu: danh mục ghi ${shown}, prompt nhận ${cited.length}.`,
+  );
 }
 
 main();

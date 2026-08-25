@@ -2,17 +2,17 @@
 
 import { Card, Eyebrow } from "@/components/ui";
 import { WritingIndicator } from "@/components/writing-indicator";
-import { CTA_CHOICES, type CtaKind } from "@/lib/compose";
+import { CTA_CHOICES, POST_KINDS, type CtaKind, type PostKind } from "@/lib/compose";
 import { VOICES, voiceById } from "@/lib/voices";
 import { LENGTH_PRESETS, MAX_WORDS, MIN_WORDS } from "@/lib/words";
 
 /**
- * Các bộ chọn dùng chung cho mọi trang có sinh bài: giọng văn, độ dài, cách kết,
- * và khung xem trước Facebook.
+ * Các bộ chọn của trang Soạn bài: dạng bài, giọng văn, độ dài, cách kết, và
+ * khung xem trước Facebook.
  *
- * Dùng chung chứ không nhân bản vì đây là chỗ người viết học thói quen: nếu
- * trang Soạn bài và trang Tổng hợp có hai thanh trượt độ dài trông khác nhau
- * thì cùng một con số lại cho cảm giác là hai thứ khác nhau.
+ * Nằm riêng ở đây từ hồi còn hai trang sinh bài — nay chỉ còn một, nhưng vẫn
+ * để nguyên chỗ này: đây là các mảnh giao diện thuần, không dính state của
+ * trang, nên tách ra thì phần logic của Soạn bài đọc được trong một màn hình.
  */
 
 export function VoicePicker({
@@ -102,6 +102,61 @@ export function LengthPicker({
 
       <p className="text-xs leading-relaxed text-ink/45">
         {preset?.note ?? "Đếm theo âm tiết tách bằng khoảng trắng."}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Dạng bài — bài một ý hay bài gộp nhiều nghiên cứu.
+ *
+ * Hai dạng đi qua hai prompt khác hẳn nhau: bài một ý viết quanh một điều duy
+ * nhất, bài gộp bị ép đủ bốn chặng trong đó có chặng "điều còn vênh nhau".
+ * Trước đây mỗi dạng nằm ở một trang riêng, chọn dạng nghĩa là chọn trang —
+ * nhưng cùng một lượt tra cứu thường viết được cả hai, nên nay là một công tắc
+ * ngay cạnh giọng văn và độ dài.
+ *
+ * `disabledRoundup` bật khi chỉ có một phát hiện: không có gì để gộp thì bốn
+ * chặng kia thành bốn chặng nói vòng quanh một con số.
+ */
+export function PostKindPicker({
+  value,
+  onChange,
+  disabled,
+  disabledRoundup,
+}: {
+  value: PostKind;
+  onChange: (kind: PostKind) => void;
+  disabled: boolean;
+  disabledRoundup: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <Eyebrow>Dạng bài</Eyebrow>
+      <div className="flex flex-wrap gap-2">
+        {POST_KINDS.map((choice) => {
+          const off = disabled || (choice.id === "tong-hop" && disabledRoundup);
+          return (
+            <button
+              key={choice.id}
+              type="button"
+              disabled={off}
+              onClick={() => onChange(choice.id)}
+              className={`border px-2.5 py-1 text-xs transition-colors disabled:opacity-40 ${
+                choice.id === value
+                  ? "border-ink text-ink"
+                  : "border-ink/15 text-ink/55 hover:border-ink/40"
+              }`}
+            >
+              {choice.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-xs leading-relaxed text-ink/45">
+        {disabledRoundup
+          ? "Mới có một phát hiện được chọn — chưa có gì để gộp. Quay lại trang Nghiên cứu tích thêm nếu muốn bài tổng hợp."
+          : POST_KINDS.find((choice) => choice.id === value)?.note}
       </p>
     </div>
   );
