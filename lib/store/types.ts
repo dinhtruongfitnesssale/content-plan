@@ -21,6 +21,18 @@ export type Post = {
 export type NewPost = Omit<Post, "id" | "createdAt">;
 
 /**
+ * Các trường sửa lại được từ Thư viện.
+ *
+ * `actualWords` KHÔNG nằm ở đây — nó luôn được đếm lại từ `body` lúc lưu. Cho
+ * sửa tay thì số từ hiện trong thư viện sẽ trôi khỏi bài thật.
+ *
+ * `papers`, `findings`, `voiceId`, `targetWords` cũng không sửa được: đó là
+ * dấu vết của lượt soạn đã qua `verifyFindings()`. Cho sửa danh mục nghiên cứu
+ * bằng tay là mở đúng cái cửa mà rào chắn chống bịa số liệu dựng lên để đóng.
+ */
+export type PostEdit = Pick<Post, "postedOn" | "topic" | "pillar" | "body">;
+
+/**
  * Nơi lưu bài. Hai bản cài đặt: localStorage (chưa cấu hình Supabase) và
  * Supabase qua route handler. Giao diện không cần biết đang dùng bản nào.
  */
@@ -28,6 +40,7 @@ export type Store = {
   mode: StoreMode;
   list(): Promise<Post[]>;
   add(post: NewPost): Promise<Post>;
+  update(id: string, edit: PostEdit): Promise<Post>;
   remove(id: string): Promise<void>;
 };
 

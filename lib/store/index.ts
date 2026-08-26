@@ -1,8 +1,9 @@
 "use client";
 
-import type { NewPost, Post, Store, StoreMode } from "./types";
+import { countWords } from "../words";
+import type { NewPost, Post, PostEdit, Store, StoreMode } from "./types";
 
-export type { NewPost, Post, StoreMode };
+export type { NewPost, Post, PostEdit, StoreMode };
 
 const LOCAL_KEY = "ban-viet:bai-viet";
 
@@ -52,6 +53,18 @@ const localStore: Store = {
     return saved;
   },
 
+  async update(id, edit) {
+    const posts = readLocal();
+    const current = posts.find((post) => post.id === id);
+    if (!current) throw new Error("Không tìm thấy bài này trong thư viện.");
+
+    // Số từ đếm lại từ thân bài, không nhận từ giao diện — cùng luật với
+    // nhánh Supabase trong `app/api/posts/route.ts`.
+    const updated: Post = { ...current, ...edit, actualWords: countWords(edit.body) };
+    writeLocal(posts.map((post) => (post.id === id ? updated : post)));
+    return updated;
+  },
+
   async remove(id) {
     writeLocal(readLocal().filter((post) => post.id !== id));
   },
@@ -90,6 +103,17 @@ const remoteStore: Store = {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(post),
+    });
+    if (!res.ok) throw new Error(await errorText(res));
+    const json = await res.json();
+    return json.post as Post;
+  },
+
+  async update(id, edit) {
+    const res = await fetch(`/api/posts?id=${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(edit),
     });
     if (!res.ok) throw new Error(await errorText(res));
     const json = await res.json();

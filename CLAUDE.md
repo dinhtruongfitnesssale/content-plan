@@ -268,6 +268,23 @@ Route handler dùng service-role key nên bỏ qua RLS. Các bảng bật RLS m�
 **không có policy nào** — khoá sạch với mọi key khác. Không bao giờ import
 `lib/supabase.ts` từ component client.
 
+Sửa lại bài đã lưu đi qua `store.update()` (`PATCH /api/posts?id=…` ở nhánh
+Supabase). `PostEdit` chỉ có bốn trường: ngày đăng, chủ đề, trụ cột, thân bài.
+Hai thứ **cố ý** không sửa được từ Thư viện:
+
+- `actualWords` — luôn đếm lại từ `body` lúc lưu, hai nhánh dùng chung
+  `countWords()`. Nhận số từ client gửi thì con số trong thư viện trôi khỏi bài
+  thật, mà bộ gợi ý chủ đề đọc đúng con số đó.
+- `papers` / `findings` — dấu vết của lượt soạn đã qua `verifyFindings()`. Mở
+  cho sửa tay là đi vòng qua rào chắn chống bịa số liệu, đúng cái nó dựng để chặn.
+
+### Lời nhắn nhỏ (toast)
+
+`useToast()` trong `components/toast.tsx`. Chỉ dùng cho việc làm xong mà **không
+đổi gì thấy được** trên màn hình — "đánh dấu đã đăng", "lưu thay đổi". Việc nào
+tự nó đổi giao diện (mở một mục, xoá một thẻ đang hiện) thì màn hình đã là lời
+báo rồi, thêm toast là nói hai lần.
+
 ### Cổng mật khẩu
 
 Next 16 đổi tên quy ước `middleware` thành `proxy` — file là `proxy.ts` ở gốc dự án,

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, EmptyNote, ErrorNote, Eyebrow, Num, PageHeader } from "@/components/ui";
+import { useToast } from "@/components/toast";
 import { WritingIndicator } from "@/components/writing-indicator";
 import {
   CtaPicker,
@@ -42,6 +43,8 @@ export function Composer() {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { toast, toastNode } = useToast();
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -211,6 +214,7 @@ export function Composer() {
         findings,
       });
       setSaved(true);
+      toast("Đã ghi nhận — bài nằm trong Thư viện rồi.");
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : "Không lưu được bài.");
     }
@@ -354,8 +358,15 @@ export function Composer() {
 
               {saved && (
                 <p className="text-xs text-herb">
-                  Đã lưu vào thư viện cùng <Num>{split.cited.length}</Num> nghiên cứu đã
-                  dẫn. Gợi ý chủ đề lần sau sẽ tính cả bài này.
+                  Đã lưu vào{" "}
+                  <Link
+                    href="/thu-vien"
+                    className="underline decoration-herb/40 underline-offset-2"
+                  >
+                    thư viện
+                  </Link>{" "}
+                  cùng <Num>{split.cited.length}</Num> nghiên cứu đã dẫn. Sửa lại câu chữ
+                  được ngay ở đó. Gợi ý chủ đề lần sau sẽ tính cả bài này.
                 </p>
               )}
             </>
@@ -368,6 +379,8 @@ export function Composer() {
           )}
         </section>
       </div>
+
+      {toastNode}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { countWords } from "@/lib/words";
 import type { Post } from "@/lib/store/types";
 
 export const runtime = "nodejs";
@@ -35,6 +36,17 @@ const NewPostSchema = z.object({
     )
     .max(30),
   findings: z.array(z.unknown()).max(20),
+});
+
+/**
+ * Sửa lại bài đã lưu. Chỉ bốn trường — `PostEdit` trong lib/store/types.ts giải
+ * thích vì sao số từ, danh mục nghiên cứu và các phát hiện không sửa được.
+ */
+const PostEditSchema = NewPostSchema.pick({
+  postedOn: true,
+  topic: true,
+  pillar: true,
+  body: true,
 });
 
 export async function GET() {
@@ -84,6 +96,47 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: `Không lưu được: ${error.message}` }, { status: 502 });
+  }
+
+  return NextResponse.json({ post: fromRow(data) });
+}
+
+export async function PATCH(request: Request) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Chưa cấu hình Supabase." }, { status: 501 });
+  }
+
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Thiếu id." }, { status: 400 });
+  }
+
+  const parsed = PostEditSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Dữ liệu bài viết không hợp lệ." }, { status: 400 });
+  }
+
+  const input = parsed.data;
+  const { data, error } = await supabase()
+    .from(TABLE)
+    .update({
+      posted_on: input.postedOn,
+      topic: input.topic,
+      pillar: input.pillar,
+      body: input.body,
+      // Đếm lại ở server, không nhận số từ do client gửi: con số này đi vào bộ
+      // gợi ý chủ đề, mà thân bài mới là sự thật.
+      actual_words: countWords(input.body),
+    })
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: `Không lưu được: ${error.message}` }, { status: 502 });
+  }
+  if (!data) {
+    return NextResponse.json({ error: "Không tìm thấy bài này." }, { status: 404 });
   }
 
   return NextResponse.json({ post: fromRow(data) });
